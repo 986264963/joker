@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Image View</title>
+  <title>Image View - AI Multi-Model Studio</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -90,22 +90,35 @@
       <div class="row">
         <select id="modelSel" class="input">
           <optgroup label="文生图模型 / Text-to-Image">
-            <option value="z-image-turbo">z-image-turbo（推荐 / 基础）[span_3](start_span)[span_3](end_span)[span_4](start_span)[span_4](end_span)</option>
-            <option value="Qwen-Image-2512">Qwen-Image-2512（通义旗舰文生图）[span_5](start_span)[span_5](end_span)</option>
-            <option value="FLUX.1-dev">FLUX.1-dev（专业级细节 / 创意设计）[span_6](start_span)[span_6](end_span)[span_7](start_span)[span_7](end_span)</option>
-            <option value="FLUX.1-schnell">FLUX.1-schnell（极速生成）[span_8](start_span)[span_8](end_span)</option>
-            <option value="Kolors">Kolors（快手开源 / 中文优秀）[span_9](start_span)[span_9](end_span)</option>
-            <option value="stable-diffusion-3.5-large-turbo">stable-diffusion-3.5-large-turbo[span_10](start_span)[span_10](end_span)</option>
-            <option value="GLM-Image">GLM-Image（智谱多模态）[span_11](start_span)[span_11](end_span)</option>
-            <option value="CogView4-6B">CogView4-6B（清华开源）[span_12](start_span)[span_12](end_span)</option>
+            <option value="z-image-turbo">z-image-turbo（推荐 / 基础）[span_1](start_span)[span_1](end_span)[span_2](start_span)[span_2](end_span)</option>
+            <option value="Qwen-Image-2.0-Pro">Qwen-Image-2.0-Pro（通义旗舰 Pro）</option>
+            <option value="Qwen-Image-2.0">Qwen-Image-2.0</option>
+            <option value="Qwen-Image-2512">Qwen-Image-2512</option>
+            <option value="FLUX.2-dev">FLUX.2-dev（最新 FLUX.2 专业级）</option>
+            <option value="FLUX.1-dev">FLUX.1-dev（专业级细节 / 创意设计）[span_3](start_span)[span_3](end_span)[span_4](start_span)[span_4](end_span)</option>
+            <option value="FLUX.1-schnell">FLUX.1-schnell（极速生成）[span_5](start_span)[span_5](end_span)</option>
+            <option value="FLUX.1-Krea-dev">FLUX.1-Krea-dev</option>
+            <option value="Kolors">Kolors（快手开源 / 中文优秀）[span_6](start_span)[span_6](end_span)</option>
+            <option value="stable-diffusion-3.5-large-turbo">stable-diffusion-3.5-large-turbo[span_7](start_span)[span_7](end_span)</option>
+            <option value="GLM-Image">GLM-Image（智谱多模态）[span_8](start_span)[span_8](end_span)</option>
+            <option value="CogView4-6B">CogView4-6B（清华开源）[span_9](start_span)[span_9](end_span)</option>
+            <option value="HiDream-I1-Full">HiDream-I1-Full</option>
+            <option value="Wan2.7-Image">Wan2.7-Image（万相图像生成）</option>
           </optgroup>
-          <optgroup label="图像编辑模型 / Image Edit">
-            <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511[span_13](start_span)[span_13](end_span)[span_14](start_span)[span_14](end_span)</option>
-            <option value="LongCat-Image-Edit">LongCat-Image-Edit（美团高精度编辑）[span_15](start_span)[span_15](end_span)</option>
+          <optgroup label="图像编辑与处理 / Image Edit & Process">
+            <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511[span_10](start_span)[span_10](end_span)[span_11](start_span)[span_11](end_span)</option>
+            <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
+            <option value="LongCat-Image-Edit">LongCat-Image-Edit（美团高精度编辑）[span_12](start_span)[span_12](end_span)</option>
+            <option value="RMBG-2.0">RMBG-2.0（高精度抠图去背景）</option>
+            <option value="Real-ESRGAN">Real-ESRGAN（图像超分辨率重建/放大）</option>
           </optgroup>
           <optgroup label="视频生成模型 / Video Generation">
-            <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频）[span_16](start_span)[span_16](end_span)</option>
-            <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频）[span_17](start_span)[span_17](end_span)</option>
+            <option value="Wan 2.7-万相视频生成模型">Wan 2.7-万相视频生成模型（最新旗舰）</option>
+            <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频）[span_13](start_span)[span_13](end_span)</option>
+            <option value="Wan2.1-T2V-14B">Wan2.1-T2V-14B（文生视频）</option>
+            <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频）[span_14](start_span)[span_14](end_span)</option>
+            <option value="ViduQ3-Pro">ViduQ3-Pro（生数科技视频生成）</option>
+            <option value="LTX-2">LTX-2（Lightricks 视频模型）</option>
           </optgroup>
         </select>
       </div>
@@ -147,12 +160,12 @@
           <input id="editImg1" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
         </div>
         <div>
-          <label class="lab">图2 Image 2</label>
+          <label class="lab">图2 Image 2（部分模型可选）</label>
           <input id="editImg2" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
         </div>
       </div>
 
-      <label class="lab">提示词 Prompt</label>
+      <label class="lab">提示词 Prompt / 操作说明</label>
       <textarea id="editPrompt" class="textarea" rows="5" placeholder="描述你要的编辑效果（例如：把背景换成海边日落，保留人物）"></textarea>
 
       <label class="lab">任务类型 Task Types（可多选 / Multi-select）</label>
@@ -175,7 +188,7 @@
       </label>
 
       <div class="hint">
-        Notes: Higher steps = slower but more detail; higher guidance = follows prompt more strongly.
+        Notes: 对于 RMBG-2.0 或 Real-ESRGAN，只需上传图1并点击执行即可。
       </div>
 
       <div class="row">
@@ -184,9 +197,9 @@
     </section>
 
     <section class="card model-panel" id="panelWan">
-      <h2>Wan2.2-I2V-A14B（图生视频 / Image-to-Video）[span_18](start_span)[span_18](end_span)</h2>
+      <h2>视频生成 / Video Generation</h2>
 
-      <label class="lab">输入图片 Image</label>
+      <label class="lab">输入图片（图生视频时必填）/ Input Image</label>
       <input id="wanImg" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
 
       <label class="lab">提示词 Prompt</label>
@@ -273,7 +286,7 @@
       </div>
 
       <div class="hint">
-        说明：若服务端单次只能生成固定 5 秒，本工具会按你指定的 Duration 分段生成并下载。<br/>
+        说明：支持 Wan2.7、Wan2.2、HunyuanVideo、ViduQ3、LTX-2 等视频模型异步任务。<br/>
       </div>
 
       <div class="row">
@@ -282,7 +295,7 @@
     </section>
 
     <section class="card model-panel" id="panelHunyuan">
-      <h2>HunyuanVideo-1.5（文生视频 / Text-to-Video）[span_19](start_span)[span_19](end_span)</h2>
+      <h2>异步视频生成 / Async Video Task</h2>
 
       <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
       <textarea id="hyPrompt" class="textarea" rows="6" placeholder="例如：年轻的中国女性穿着传统红色古装，轻轻撩起头纱，特写镜头，浅景深，暖色调"></textarea>
@@ -325,7 +338,7 @@
       </div>
 
       <div class="hint">
-        说明：这是异步任务接口，会先返回 task_id，然后自动轮询状态直至 success/failed。<br/>
+        说明：适用于 HunyuanVideo-1.5 及其他通用异步视频模型接口。<br/>
       </div>
 
       <div class="row">
