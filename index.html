@@ -1,73 +1,135 @@
-<!-- Z‑Image‑Turbo 独立面板 -->
-<div id="panelZTurbo" class="panel" style="display:none;">
-  <div>
-    <label>分辨率</label>
-    <select id="zTurboRes">
-      <option>1:1 (2048x2048)</option>
-      <option>1:1 (1024x1024)</option>
-      <option>3:4 (768x1024)</option>
-      <option>4:3 (1024x768)</option>
-      <option>16:9 (1024x576)</option>
-      <option>9:16 (576x1024)</option>
-    </select>
-  </div>
-  <div>
-    <label>步数</label>
-    <input type="number" id="zTurboSteps" value="28">
-  </div>
-</div>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image View</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-main">
+      <div class="topbar-left">
+        <div class="brand-mark">M</div>
+        <div class="h1">Image View</div>
+      </div>
 
-<!-- Qwen‑Image‑2512 独立面板 -->
-<div id="panelQwen2512" class="panel" style="display:none;">
-  <div>
-    <label>分辨率</label>
-    <select id="qwen2512Res">
-      <option>1:1 (2048x2048)</option>
-      <option>1:1 (1024x1024)</option>
-      <option>3:4 (768x1024)</option>
-      <option>4:3 (1024x768)</option>
-      <option>16:9 (1024x576)</option>
-      <option>9:16 (576x1024)</option>
-    </select>
-  </div>
-  <div>
-    <label>步数</label>
-    <input type="number" id="qwen2512Steps" value="30">
-  </div>
-</div>
+      <div class="topbar-right">
+        <a
+          class="top-icon-btn"
+          href="https://github.com/MallocPointer/gitee/"
+          target="_blank"
+          rel="noopener"
+          aria-label="GitHub 仓库"
+          title="GitHub 仓库"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.11.79-.25.79-.56v-2.16c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.68-1.27-1.68-1.04-.72.08-.71.08-.71 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.67 1.25 3.32.96.1-.74.4-1.25.72-1.54-2.56-.29-5.25-1.28-5.25-5.72 0-1.27.46-2.3 1.19-3.12-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.19 1.19a11.1 11.1 0 0 1 5.8 0c2.22-1.5 3.19-1.19 3.19-1.19.63 1.58.23 2.75.11 3.04.74.82 1.19 1.85 1.19 3.12 0 4.45-2.7 5.43-5.28 5.72.41.35.78 1.05.78 2.11v3.12c0 .31.21.68.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
 
-<!-- HiDream‑I1‑Full 独立面板 -->
-<div id="panelHiDream" class="panel" style="display:none;">
-  <div>
-    <label>分辨率</label>
-    <select id="hiDreamRes">
-      <option>1:1 (1024x1024)</option>
-      <option>3:4 (768x1024)</option>
-      <option>4:3 (1024x768)</option>
-      <option>16:9 (1024x576)</option>
-      <option>9:16 (576x1024)</option>
-    </select>
-  </div>
-  <div>
-    <label>步数</label>
-    <input type="number" id="hiDreamSteps" value="25">
-  </div>
-</div>
+        <button
+          class="top-icon-btn coffee-btn"
+          id="donateBtn"
+          type="button"
+          aria-label="赞助项目"
+          title="赞助项目"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h9A2.5 2.5 0 0 1 17 6.5V7h1.75A3.25 3.25 0 0 1 22 10.25c0 1.64-1.23 3.02-2.86 3.21A5.5 5.5 0 0 1 13.75 18h-6.5A5.25 5.25 0 0 1 2 12.75V6.5Zm14 2V11a1.75 1.75 0 0 0 0-3.5H17Z"/>
+            <path fill="currentColor" d="M6 20a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Z"/>
+          </svg>
+          <span>赞助</span>
+        </button>
 
-<!-- FLUX.2‑dev 独立面板 -->
-<div id="panelFlux2Dev" class="panel" style="display:none;">
-  <div>
-    <label>分辨率</label>
-    <select id="flux2DevRes">
-      <option>1:1 (1024x1024)</option>
-      <option>3:4 (768x1024)</option>
-      <option>4:3 (1024x768)</option>
-      <option>16:9 (1024x576)</option>
-      <option>9:16 (576x1024)</option>
-    </select>
+        <div class="status">
+          <span class="badge" id="statusBadge">准备就绪 / Ready</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="topbar-sub">
+      <span class="api-label">API 注册地址:</span>
+      <span class="mono api-link">https://ai.gitee.com/serverless-api</span>
+    </div>
+  </header>
+
+  <div class="donate-modal" id="donateModal" aria-hidden="true">
+    <div class="donate-mask" id="donateMask"></div>
+    <div class="donate-panel" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
+      <button class="donate-close" id="donateClose" type="button" aria-label="关闭">×</button>
+      <div class="donate-eyebrow">Support this project</div>
+      <h3 id="donateTitle">Buy me a coffee</h3>
+      <p class="donate-text">
+        如果真的帮助到了你，请为我打赏一杯咖啡吧，有了你的赞助，我会将服务一直运行下去的。 我的联系方式：admin@airymoon.com。 项目开源地址：https://github.com/MallocPointer/gitee/
+      </p>
+      <img class="donate-image" src="./image.png" alt="项目赞助收款码" />
+      <a class="btn primary donate-download" href="./image.png" target="_blank" rel="noopener">打开收款码</a>
+    </div>
   </div>
-  <div>
-    <label>步数</label>
-    <input type="number" id="flux2DevSteps" value="35">
-  </div>
-</div>
+
+  <main class="container">
+    <section class="card">
+      <h2>1. 输入 API Key / Enter API Key</h2>
+      <div class="row">
+        <input id="apiKey" class="input" placeholder="Bearer Token" />
+        <label class="chk">
+          <input type="checkbox" id="rememberKey" />
+          记住（localStorage）
+        </label>
+        <button class="btn" id="btnClearKey">清除</button>
+      </div>
+      <div class="hint">
+        提示：本工具默认通过同站点的 <span class="mono">/api/*</span> 代理转发到 <span class="mono">https://ai.gitee.com/v1</span>，避免浏览器 CORS 限制。
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. 选择模型 / Select Model</h2>
+      <div class="row">
+        <select id="modelSel" class="input">
+          <option value="z-image">z-image（文生图 / Text-to-Image）</option>
+          <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
+          <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
+          <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="card model-panel" id="panelZ">
+      <h2>z-image（文生图 / Text-to-Image）</h2>
+
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
+
+      <div class="grid2">
+        <div>
+          <label class="lab">分辨率 Resolution</label>
+          <select id="zRes" class="input"></select>
+        </div>
+        <div>
+          <label class="lab">张数 n（1-4）</label>
+          <input id="zN" class="input" type="number" min="1" max="4" value="1" />
+        </div>
+      </div>
+
+      <div class="hint">
+        建议：2048 更清晰但更慢更贵；n&gt;1 会输出多张。<br/>
+        Tip: 2048 is sharper but slower/more expensive; n&gt;1 outputs multiple images.
+      </div>
+
+      <div class="row">
+        <button class="btn primary" id="btnZGenerate">生成图片</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>输出结果 Output</h2>
+      <div id="outputBox" class="output-box"></div>
+    </section>
+  </main>
+
+  <script src="./main.js"></script>
+</body>
+</html>
