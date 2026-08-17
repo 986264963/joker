@@ -89,19 +89,57 @@
       <h2>2. 选择模型 / Select Model</h2>
       <div class="row">
         <select id="modelSel" class="input">
-          <optgroup label="文生图模型 / Text-to-Image">
-            <option value="Qwen-Image-2512">Qwen-Image-2512（支持反向提示词）</option>
-            <option value="z-image-turbo">z-image-turbo（极速生成）</option>
+          <optgroup label="🖼️ 图像生成模型 (Text-to-Image / Image Edit)">
+            <option value="z-image-turbo">20. z-image-turbo（推荐 / 基础）</option>
+            <option value="RMBG-2.0">1. RMBG-2.0（抠图去背景）</option>
+            <option value="stable-diffusion-3.5-large-turbo">2. stable-diffusion-3.5-large-turbo</option>
+            <option value="FLUX.1-schnell">3. FLUX.1-schnell</option>
+            <option value="Kolors">4. Kolors（中文优秀）</option>
+            <option value="stable-diffusion-3-medium">5. stable-diffusion-3-medium</option>
+            <option value="stable-diffusion-xl-base-1.0">6. stable-diffusion-xl-base-1.0</option>
+            <option value="FLUX.1-dev">7. FLUX.1-dev（专业级）</option>
+            <option value="HiDream-I1-Full">8. HiDream-I1-Full</option>
+            <option value="Florence-2-large">9. Florence-2-large</option>
+            <option value="UVDoc">10. UVDoc</option>
+            <option value="Qwen-Image">11. Qwen-Image</option>
+            <option value="FLUX.1-Krea-dev">12. FLUX.1-Krea-dev</option>
+            <option value="CogView4-6B">13. CogView4-6B</option>
+            <option value="FLUX.1-Kontext-dev">14. FLUX.1-Kontext-dev</option>
+            <option value="AnimeSharp">15. AnimeSharp</option>
+            <option value="Real-ESRGAN">16. Real-ESRGAN（超分放大）</option>
+            <option value="FLUX.2-dev">17. FLUX.2-dev</option>
+            <option value="LongCat-Image-Edit">18. LongCat-Image-Edit</option>
+            <option value="LongCat-Image">19. LongCat-Image</option>
+            <option value="SeedVR2-3B">21. SeedVR2-3B</option>
+            <option value="Qwen-Image-Edit">22. Qwen-Image-Edit</option>
+            <option value="FLUX.2-klein-9B">23. FLUX.2-klein-9B</option>
+            <option value="GLM-Image">24. GLM-Image</option>
+            <option value="Qwen-Image-2512">25. Qwen-Image-2512</option>
+            <option value="VajraV1">26. VajraV1</option>
+            <option value="SAM 3 图像分割模型">27. SAM 3 图像分割模型</option>
+            <option value="Qwen-Image-Edit-2511">28. Qwen-Image-Edit-2511</option>
+            <option value="Qwen-Image-2.0-Pro">29. Qwen-Image-2.0-Pro</option>
+            <option value="Wan2.7-Image-Pro">30. Wan2.7-Image-Pro</option>
+            <option value="Wan2.7-Image">31. Wan2.7-Image</option>
+            <option value="Qwen-Image-2.0">32. Qwen-Image-2.0</option>
+            <option value="Z-Image">33. Z-Image</option>
+            <option value="FLUX.2-klein-4B">34. FLUX.2-klein-4B</option>
+            <option value="Qwen-Image-Layered">35. Qwen-Image-Layered</option>
           </optgroup>
-          <optgroup label="图生图与图像编辑 / Image Edit">
-            <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
-            <option value="GLM-Image-Edit">GLM-Image-Edit</option>
-            <option value="Z-Image-Edit">Z-Image-Edit</option>
-          </optgroup>
-          <optgroup label="视频生成模型 / Video Generation">
-            <option value="Wan2.2-T2V-A14B">Wan2.2-T2V-A14B（文生视频）</option>
-            <option value="Wan2.7-Video">Wan2.7-Video（万相视频模型）</option>
-            <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频）</option>
+          <optgroup label="🎬 视频生成模型 (Video Generation)">
+            <option value="Wan 2.7-万相视频生成模型">13. Wan 2.7-万相视频生成模型（最新旗舰）</option>
+            <option value="HappyHorse-1.0">1. HappyHorse-1.0</option>
+            <option value="LTX-2">2. LTX-2</option>
+            <option value="InfiniteTalk 数字人模型">3. InfiniteTalk 数字人模型</option>
+            <option value="HunyuanVideo-1.5">4. HunyuanVideo-1.5</option>
+            <option value="Wan2.2-I2V-A14B">5. Wan2.2-I2V-A14B（图生视频）</option>
+            <option value="Wan2.1-T2V-14B">6. Wan2.1-T2V-14B（文生视频）</option>
+            <option value="Duix-Avatar">7. Duix-Avatar</option>
+            <option value="HappyHorse-1.1">8. HappyHorse-1.1</option>
+            <option value="ViduQ3-Pro">9. ViduQ3-Pro</option>
+            <option value="ViduQ2-Pro">10. ViduQ2-Pro</option>
+            <option value="ViduQ2-Turbo">11. ViduQ2-Turbo</option>
+            <option value="ViduQ3-Turbo">12. ViduQ3-Turbo</option>
           </optgroup>
         </select>
       </div>
@@ -111,10 +149,7 @@
       <h2 id="t2iTitle">文生图 / Text-to-Image</h2>
 
       <label class="lab">提示词 Prompt（中/英均可）</label>
-      <textarea id="zPrompt" class="textarea" rows="5" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
-
-      <label class="lab">反向提示词 Negative Prompt（Qwen-Image-2512 等模型适用）</label>
-      <textarea id="zNegPrompt" class="textarea" rows="3" placeholder="例如：lowres, blurry, bad anatomy, deformed"></textarea>
+      <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
 
       <div class="grid2">
         <div>
@@ -133,7 +168,7 @@
     </section>
 
     <section class="card model-panel" id="panelEdit">
-      <h2 id="editTitle">图生图与图像编辑 / Image Edit</h2>
+      <h2 id="editTitle">图像编辑 / Image Edit</h2>
 
       <div class="grid2">
         <div>
@@ -148,6 +183,9 @@
 
       <label class="lab">提示词 Prompt / 操作说明</label>
       <textarea id="editPrompt" class="textarea" rows="5" placeholder="描述你要的编辑效果（例如：把背景换成海边日落，保留人物）"></textarea>
+
+      <label class="lab">任务类型 Task Types（可多选）</label>
+      <div class="checks" id="editTaskTypes"></div>
 
       <div class="grid2">
         <div>
@@ -173,7 +211,7 @@
     <section class="card model-panel" id="panelWan">
       <h2>视频生成 / Video Generation</h2>
 
-      <label class="lab">输入图片（图生视频 Wan2.2-I2V-A14B 必填）/ Input Image</label>
+      <label class="lab">输入图片（图生视频时必填）/ Input Image</label>
       <input id="wanImg" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
 
       <label class="lab">提示词 Prompt</label>
@@ -181,6 +219,21 @@
 
       <label class="lab">负面提示词 Negative Prompt（可选）</label>
       <textarea id="wanNeg" class="textarea" rows="3" placeholder="例如：lowres, blurry, watermark"></textarea>
+
+      <div class="grid3">
+        <div>
+          <label class="lab">预设 Preset</label>
+          <select id="wanPreset" class="input">
+            <option>标准 / Standard</option>
+            <option>更清晰 / Sharper</option>
+            <option>更动感 / More motion</option>
+            <option>更快 / Faster</option>
+          </select>
+        </div>
+        <div class="row-inline">
+          <button class="btn" id="btnWanApplyPreset">应用预设 / Apply</button>
+        </div>
+      </div>
 
       <div class="grid3">
         <div>
@@ -215,7 +268,7 @@
       <div class="grid3">
         <label class="chk"><input type="checkbox" id="wanWatermark" /> watermark 水印</label>
         <label class="chk"><input type="checkbox" id="wanPromptExtend" /> prompt_extend 自动扩写</label>
-        <label class="chk"><input type="checkbox" id="wanOpenUrl" /> 完成后打开 file_url</label>
+        <label class="chk"><input type="checkbox" id="wanOpenUrl" /> 完成后浏览器打开 file_url</label>
       </div>
 
       <div class="grid3">
@@ -236,7 +289,7 @@
       <div class="row">
         <label class="chk">
           <input type="checkbox" id="wanAutoFrames" checked />
-          num_frames 自动 = FPS×5s
+          num_frames 自动 = FPS×5s（推荐）
         </label>
         <label class="chk">
           <input type="checkbox" id="wanZipSegments" />
@@ -246,6 +299,54 @@
 
       <div class="row">
         <button class="btn primary" id="btnWanRun">执行 / Generate Video</button>
+      </div>
+    </section>
+
+    <section class="card model-panel" id="panelHunyuan">
+      <h2>异步视频生成 / Async Video Task</h2>
+
+      <label class="lab">提示词 Prompt（中/英均可）</label>
+      <textarea id="hyPrompt" class="textarea" rows="6" placeholder="例如：年轻的中国女性穿着传统红色古装，轻轻撩起头纱，特写镜头，浅景深，暖色调"></textarea>
+
+      <label class="lab">负面提示词 Negative Prompt（可选）</label>
+      <textarea id="hyNeg" class="textarea" rows="3" placeholder="例如：lowres, blurry, watermark"></textarea>
+
+      <div class="grid3">
+        <div>
+          <label class="lab">画面比例 Aspect Ratio</label>
+          <select id="hyAspect" class="input">
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+          </select>
+        </div>
+        <div>
+          <label class="lab">steps num_inferenece_steps（1-10）</label>
+          <input id="hySteps" class="input" type="number" min="1" max="10" value="10" />
+        </div>
+        <div>
+          <label class="lab">fps（1-24）</label>
+          <input id="hyFps" class="input" type="number" min="1" max="24" value="24" />
+        </div>
+      </div>
+
+      <div class="grid3">
+        <div>
+          <label class="lab">num_frames（81-241）</label>
+          <input id="hyFrames" class="input" type="number" min="81" max="241" value="241" />
+        </div>
+        <div>
+          <label class="lab">seed（正整数）</label>
+          <input id="hySeed" class="input" type="number" min="1" max="2147483647" value="1" />
+        </div>
+        <label class="chk">
+          <input type="checkbox" id="hyOpenUrl" />
+          完成后浏览器打开 file_url
+        </label>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" id="btnHyRun">执行 / Generate Video</button>
       </div>
     </section>
 
@@ -261,7 +362,7 @@
   </main>
 
   <footer class="footer">
-    <div class="mono">Powered by Cloudflare Pages Functions proxy • 请遵守相关法律法规</div>
+    <div class="mono">Powered by Cloudflare Pages Functions proxy • 请自觉遵守相关法律法规</div>
   </footer>
 
   <script src="./app.js"></script>
