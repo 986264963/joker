@@ -13,7 +13,6 @@
         <div class="brand-mark">M</div>
         <div class="h1">Image View</div>
       </div>
-
       <div class="topbar-right">
         <a
           class="top-icon-btn"
@@ -28,7 +27,6 @@
           </svg>
           <span>GitHub</span>
         </a>
-
         <button
           class="top-icon-btn coffee-btn"
           id="donateBtn"
@@ -42,13 +40,11 @@
           </svg>
           <span>赞助</span>
         </button>
-
         <div class="status">
           <span class="badge" id="statusBadge">准备就绪 / Ready</span>
         </div>
       </div>
     </div>
-
     <div class="topbar-sub">
       <span class="api-label">API 注册地址:</span>
       <span class="mono api-link">https://ai.gitee.com/serverless-api</span>
@@ -89,36 +85,33 @@
       <h2>2. 选择模型 / Select Model</h2>
       <div class="row">
         <select id="modelSel" class="input">
-          <option value="z-image">z-image（文生图 / Text-to-Image）</option>
-          <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
-          <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
-          <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
+          <option value="z-image">z‑image（文生图 / Text‑to‑Image）</option>
+          <option value="Edit‑2511">Edit‑2511（图像编辑 / Image Edit）</option>
+          <option value="Wan2.2‑I2V‑A14B">Wan2.2‑I2V‑A14B（图生视频 / Image‑to‑Video）</option>
+          <option value="HunyuanVideo‑1.5">HunyuanVideo‑1.5（文生视频 / Text‑to‑Video）</option>
         </select>
       </div>
     </section>
 
+    <!-- z-image 文生图面板，保证完整，不会丢失 -->
     <section class="card model-panel" id="panelZ">
-      <h2>z-image（文生图 / Text-to-Image）</h2>
-
+      <h2>z‑image（文生图 / Text‑to‑Image）</h2>
       <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
       <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
-
       <div class="grid2">
         <div>
           <label class="lab">分辨率 Resolution</label>
           <select id="zRes" class="input"></select>
         </div>
         <div>
-          <label class="lab">张数 n（1-4）</label>
+          <label class="lab">张数 n（1‑4）</label>
           <input id="zN" class="input" type="number" min="1" max="4" value="1" />
         </div>
       </div>
-
       <div class="hint">
         建议：2048 更清晰但更慢更贵；n&gt;1 会输出多张。<br/>
         Tip: 2048 is sharper but slower/more expensive; n&gt;1 outputs multiple images.
       </div>
-
       <div class="row">
         <button class="btn primary" id="btnZGenerate">生成图片</button>
       </div>
