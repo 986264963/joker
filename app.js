@@ -1,10 +1,3 @@
-// Moark Web (Cloudflare Pages/Workers)
-// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
-// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
-
-const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
-const $ = (id) => document.getElementById(id);
-
 const MODELS = [
   { value: "z-image", label: "Z‑Image", panel:"z" },
   { value: "z-image-turbo", label: "Z‑Image‑Turbo(人体性价比)", panel:"zTurbo" },
@@ -25,228 +18,77 @@ const Z_RESOLUTIONS = {
   "9:16 (576x1024)": [576, 1024],
 };
 
-const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
-
-const WAN_RES_PRESETS = {
-  "480p 横屏 / 832x480 (推荐 / Recommended)": [832, 480],
-  "480p 竖屏 / 480x832": [480, 832],
-  "720p 横屏 / 1280x720": [1280, 720],
-  "720p 竖屏 / 720x1280": [720, 1280],
-  "1024 方图 / 1024x1024": [1024, 1024],
-  "2048 方图 / 2048x2048 (高成本 / Expensive)": [2048, 2048],
-};
-
-function nowTs() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
-
-function setStatus(text, kind="info") {
-  const badge = $("statusBadge");
-  if (!badge) return;
-
-  badge.textContent = text;
-  badge.style.borderColor =
-    kind === "ok" ? "rgba(37,194,160,.7)" :
-    kind === "err" ? "rgba(255,84,112,.75)" :
-    "rgba(255,255,255,.10)";
-
-  badge.style.background =
-    kind === "ok" ? "rgba(37,194,160,.10)" :
-    kind === "err" ? "rgba(255,84,112,.10)" :
-    "rgba(255,255,255,.06)";
-}
-
-function waitingStatusText(label, tick, elapsedMs, extra="") {
-  const sec = Math.floor(elapsedMs / 1000);
-  const extraText = extra ? ` • ${extra}` : "";
-  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查${extraText} • 正常等待，并非卡死`;
-}
-
-function getApiKey() {
-  const key = $("apiKey").value.trim();
-  if (!key) throw new Error("请输入 API Key / Please enter API Key");
-  return key;
-}
-
-function rememberKeyMaybe() {
-  const key = $("apiKey").value.trim();
-  if ($("rememberKey").checked && key) {
-    localStorage.setItem("moark_api_key", key);
-  }
-}
-
-function loadRememberedKey() {
-  const key = localStorage.getItem("moark_api_key") || "";
-  if (key) {
-    $("apiKey").value = key;
-    $("rememberKey").checked = true;
-  }
-}
-
-function clearRememberedKey() {
-  localStorage.removeItem("moark_api_key");
-  $("apiKey").value = "";
-  $("rememberKey").checked = false;
-}
-
-// 面板切换：全部隐藏，只展示当前模型独立面板
+// 切换面板
 function showPanel(model) {
-  $("panelZ").style.display = "none";
-  $("panelZTurbo").style.display = "none";
-  $("panelQwen2512").style.display = "none";
-  $("panelHiDream").style.display = "none";
-  $("panelFlux2Dev").style.display = "none";
-  $("panelEdit").style.display = "none";
-  $("panelWan").style.display = "none";
-  $("panelHunyuan").style.display = "none";
+  document.getElementById("panelZ").style.display = "none";
+  document.getElementById("panelZTurbo").style.display = "none";
+  document.getElementById("panelQwen2512").style.display = "none";
+  document.getElementById("panelHiDream").style.display = "none";
+  document.getElementById("panelFlux2Dev").style.display = "none";
+  document.getElementById("panelEdit").style.display = "none";
+  document.getElementById("panelWan").style.display = "none";
+  document.getElementById("panelHunyuan").style.display = "none";
 
   switch(model){
     case "z-image":
-      $("panelZ").style.display = "block";
+      document.getElementById("panelZ").style.display = "block";
       break;
     case "z-image-turbo":
-      $("panelZTurbo").style.display = "block";
+      document.getElementById("panelZTurbo").style.display = "block";
       break;
     case "Qwen‑Image‑2512":
-      $("panelQwen2512").style.display = "block";
+      document.getElementById("panelQwen2512").style.display = "block";
       break;
     case "HiDream‑I1‑Full":
-      $("panelHiDream").style.display = "block";
+      document.getElementById("panelHiDream").style.display = "block";
       break;
     case "FLUX.2‑dev":
-      $("panelFlux2Dev").style.display = "block";
+      document.getElementById("panelFlux2Dev").style.display = "block";
       break;
     case "Edit-2511":
-      $("panelEdit").style.display = "block";
+      document.getElementById("panelEdit").style.display = "block";
       break;
     case "Wan2.2-I2V-A14B":
-      $("panelWan").style.display = "block";
+      document.getElementById("panelWan").style.display = "block";
       break;
     case "HunyuanVideo-1.5":
-      $("panelHunyuan").style.display = "block";
+      document.getElementById("panelHunyuan").style.display = "block";
       break;
   }
 }
 
-// 根据选中模型读取宽高
+// 获取对应模型宽高
 function getCurrentWH(selectedModel){
   let selText;
   switch(selectedModel){
     case "z-image":
-      selText = $("zRes").value;
+      selText = document.getElementById("zRes").value;
       return Z_RESOLUTIONS[selText];
     case "z-image-turbo":
-      selText = $("zTurboRes").value;
+      selText = document.getElementById("zTurboRes").value;
       return Z_RESOLUTIONS[selText];
     case "Qwen‑Image‑2512":
-      selText = $("qwen2512Res").value;
+      selText = document.getElementById("qwen2512Res").value;
       return Z_RESOLUTIONS[selText];
     case "HiDream‑I1‑Full":
-      selText = $("hiDreamRes").value;
+      selText = document.getElementById("hiDreamRes").value;
       return Z_RESOLUTIONS[selText];
     case "FLUX.2‑dev":
-      selText = $("flux2DevRes").value;
+      selText = document.getElementById("flux2DevRes").value;
       return Z_RESOLUTIONS[selText];
     default:
       return [1024,1024];
   }
 }
 
-// 根据选中模型读取采样步数
+// 获取对应模型步数
 function getCurrentSteps(selectedModel){
   switch(selectedModel){
-    case "z-image": return Number($("zSteps").value||28);
-    case "z-image-turbo": return Number($("zTurboSteps").value||28);
-    case "Qwen‑Image‑2512": return Number($("qwen2512Steps").value||30);
-    case "HiDream‑I1‑Full": return Number($("hiDreamSteps").value||25);
-    case "FLUX.2‑dev": return Number($("flux2DevSteps").value||35);
+    case "z-image": return Number(document.getElementById("zSteps").value||28);
+    case "z-image-turbo": return Number(document.getElementById("zTurboSteps").value||28);
+    case "Qwen‑Image‑2512": return Number(document.getElementById("qwen2512Steps").value||30);
+    case "HiDream‑I1‑Full": return Number(document.getElementById("hiDreamSteps").value||25);
+    case "FLUX.2‑dev": return Number(document.getElementById("flux2DevSteps").value||35);
     default: return 28;
   }
-}
-
-function addOutputItem({title, kind="info", meta="", element=null, rawJson=null, download=null, openUrl=null}) {
-  const out = $("output");
-  const box = document.createElement("div");
-  box.className = "item";
-
-  const h = document.createElement("h3");
-  h.textContent = title;
-  box.appendChild(h);
-
-  if (meta) {
-    const m = document.createElement("div");
-    m.className = "meta";
-    m.textContent = meta;
-    box.appendChild(m);
-  }
-
-  if (element) box.appendChild(element);
-
-  if (rawJson) {
-    const pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(rawJson, null, 2);
-    box.appendChild(pre);
-
-    const btns = document.createElement("div");
-    btns.className = "row";
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = "下载 JSON / Download JSON";
-    b.onclick = () => downloadBlob(new Blob([pre.textContent], {type:"application/json"}), `${title}_${nowTs()}.json`);
-    btns.appendChild(b);
-    box.appendChild(btns);
-  }
-
-  if (download) {
-    const btn = document.createElement("a");
-    btn.className = "btn";
-    btn.textContent = "下载 / Download";
-    btn.href = download.href;
-    btn.download = download.filename || "";
-    btn.target = "_blank";
-    btn.rel = "noopener";
-    const row = document.createElement("div");
-    row.className = "row";
-    row.appendChild(btn);
-
-    if (openUrl) {
-      const b2 = document.createElement("a");
-      b2.className = "btn";
-      b2.textContent = "打开 file_url";
-      b2.href = openUrl;
-      b2.target = "_blank";
-      b2.rel = "noopener";
-      row.appendChild(b2);
-    }
-    box.appendChild(row);
-  } else if (openUrl) {
-    const row = document.createElement("div");
-    row.className = "row";
-    const b2 = document.createElement("a");
-    b2.className = "btn";
-    b2.textContent = "打开 file_url";
-    b2.href = openUrl;
-    b2.target = "_blank";
-    b2.rel = "noopener";
-    row.appendChild(b2);
-    box.appendChild(row);
-  }
-
-  out.prepend(box);
-  return box;
-}
-
-function clearOutput() {
-  $("output").innerHTML = "";
-}
-
-// Same‑origin proxy to ai.gitee.com/v1
-async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
-  const url = `/api${path}`;
-  const req = { method, headers };
-  if(body) req.body = JSON.stringify(body);
-  if(signal) req.signal = signal;
-  return fetch(url, req);
 }
