@@ -75,43 +75,29 @@ function clearRememberedKey() {
   $("rememberKey").checked = false;
 }
 
-const T2I_MODELS = [
-  "z-image-turbo", "Qwen-Image-2.0-Pro", "Qwen-Image-2.0", "Qwen-Image-2512",
-  "FLUX.2-dev", "FLUX.1-dev", "FLUX.1-schnell", "FLUX.1-Krea-dev", 
-  "Kolors", "stable-diffusion-3.5-large-turbo", "GLM-Image", "CogView4-6B",
-  "HiDream-I1-Full", "Wan2.7-Image", "stable-diffusion-3-medium", 
-  "stable-diffusion-xl-base-1.0", "Florence-2-large", "UVDoc", "Qwen-Image",
-  "FLUX.1-Kontext-dev", "AnimeSharp", "LongCat-Image", "SeedVR2-3B", 
-  "FLUX.2-klein-9B", "VajraV1", "SAM 3 图像分割模型", "Wan2.7-Image-Pro",
-  "Z-Image", "FLUX.2-klein-4B", "Qwen-Image-Layered"
-];
-
-const EDIT_MODELS = [
-  "Qwen-Image-Edit-2511", "Qwen-Image-Edit", "LongCat-Image-Edit", "RMBG-2.0", "Real-ESRGAN"
-];
-
-const VIDEO_MODELS = [
-  "Wan 2.7-万相视频生成模型", "Wan2.2-I2V-A14B", "Wan2.1-T2V-14B", 
-  "HunyuanVideo-1.5", "ViduQ3-Pro", "LTX-2", "HappyHorse-1.0", 
-  "InfiniteTalk 数字人模型", "Duix-Avatar", "HappyHorse-1.1", 
-  "ViduQ2-Pro", "ViduQ2-Turbo", "ViduQ3-Turbo"
-];
+// 严格按照用户指定的白名单模型
+const T2I_MODELS = ["Qwen-Image-2512", "z-image-turbo"];
+const EDIT_MODELS = ["Qwen-Image-Edit-2511", "GLM-Image-Edit", "Z-Image-Edit"];
+const VIDEO_MODELS = ["Wan2.2-T2V-A14B", "Wan2.7-Video", "Wan2.2-I2V-A14B"];
 
 function showPanel(model) {
   const isT2I = T2I_MODELS.includes(model);
   const isEdit = EDIT_MODELS.includes(model);
-  const isVideo = VIDEO_MODELS.includes(model) || model === "Wan2.2-I2V-A14B" || model === "HunyuanVideo-1.5";
+  const isVideo = VIDEO_MODELS.includes(model);
 
   $("panelZ").style.display = isT2I ? "block" : "none";
   $("panelEdit").style.display = isEdit ? "block" : "none";
-  $("panelWan").style.display = (isVideo && model !== "HunyuanVideo-1.5") ? "block" : "none";
-  $("panelHunyuan").style.display = (model === "HunyuanVideo-1.5" || isVideo) ? "block" : "none";
+  $("panelWan").style.display = isVideo ? "block" : "none";
 
   if (isT2I) {
     $("t2iTitle").textContent = `${model}（文生图 / Text-to-Image）`;
   }
   if (isEdit) {
-    $("editTitle").textContent = `${model}（图像编辑处理 / Image Process）`;
+    $("editTitle").textContent = `${model}（图生图 / Image-to-Image）`;
+  }
+  if (isVideo) {
+    const isI2V = model === "Wan2.2-I2V-A14B";
+    $("wanImgLabel").textContent = isI2V ? "输入图片（图生视频必填）/ Input Image" : "输入图片（可选）/ Input Image";
   }
 }
 
@@ -252,79 +238,6 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
   return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
 }
 
-// -------- 异步视频任务处理 --------
-async function runHunyuanVideo() {
-  const apiKey = getApiKey();
-  rememberKeyMaybe();
-
-  const model = $("modelSel").value;
-  const prompt = $("hyPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词");
-
-  const negative_prompt = $("hyNeg").value.trim();
-  const aspect_ratio = $("hyAspect").value;
-  const num_inferenece_steps = clampInt($("hySteps").value, 1, 10, 10);
-  const num_frames = clampInt($("hyFrames").value, 81, 241, 241);
-
-  const seed = clampInt($("hySeed").value, 1, 2147483647, 1);
-  const fps = clampInt($("hyFps").value, 1, 24, 24);
-  const openAfter = $("hyOpenUrl").checked;
-
-  const payload = {
-    prompt,
-    model: VIDEO_MODELS.includes(model) ? model : "HunyuanVideo-1.5",
-    aspect_ratio,
-    negative_prompt,
-    num_inferenece_steps,
-    num_frames,
-    seed,
-    fps,
-  };
-
-  setStatus(`${model} 创建任务...`);
-  const res = await apiFetch("async/videos/generations", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const j = await readJsonSafely(res);
-  if (!res.ok || !j.task_id) {
-    setStatus(`${model} 失败`, "err");
-    addOutputItem({ title: `${model} 创建任务失败`, rawJson: j });
-    throw new Error(`API 错误 (${res.status})`);
-  }
-
-  const taskId = j.task_id;
-  setStatus(`${model} 任务已创建，开始轮询...`);
-  const result = await pollTask(taskId, apiKey, {
-    intervalMs: 10000,
-    onTick: (info) => setStatus(waitingStatusText(model, info.tick, info.elapsedMs)),
-  });
-
-  if (result.status !== "success") {
-    setStatus(`${model} 失败`, "err");
-    addOutputItem({ title: `${model} 任务结束：${result.status}`, rawJson: result.raw });
-    return;
-  }
-
-  const fileUrl = result.raw?.output?.file_url;
-  if (fileUrl) {
-    const blobInfo = await fetchAsBlob(fileUrl);
-    const video = document.createElement("video");
-    video.src = blobInfo.objUrl;
-    video.controls = true;
-
-    addOutputItem({
-      title: `${model} 输出视频`,
-      element: video,
-      download: { href: blobInfo.objUrl, filename: `video-${nowTs()}.mp4` },
-      openUrl: openAfter ? fileUrl : null,
-    });
-    setStatus(`${model} 成功`, "ok");
-  }
-}
-
 // -------- 文生图 --------
 async function runTextToImage() {
   const apiKey = getApiKey();
@@ -334,15 +247,21 @@ async function runTextToImage() {
   const prompt = $("zPrompt").value.trim();
   if (!prompt) throw new Error("请输入提示词");
 
+  const negPrompt = $("zNegPrompt").value.trim();
   const n = clampInt($("zN").value, 1, 4, 1);
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}x${h}`;
 
   setStatus(`${model} 生成中...`);
+  const payload = { prompt, model, n, size };
+  if (negPrompt) {
+    payload.negative_prompt = negPrompt;
+  }
+
   const res = await apiFetch("images/generations", {
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, model, n, size }),
+    body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
@@ -380,7 +299,7 @@ async function runTextToImage() {
   setStatus(`${model} 成功`, "ok");
 }
 
-// -------- 图像编辑处理 --------
+// -------- 图生图 / 图像编辑 --------
 async function runEdit() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -390,7 +309,7 @@ async function runEdit() {
   const f2 = $("editImg2").files?.[0];
   const prompt = $("editPrompt").value.trim();
 
-  if (!f1) throw new Error("请至少上传主图片");
+  if (!f1) throw new Error("请至少上传主图片 (Image 1)");
 
   const fd = new FormData();
   fd.append("model", model);
@@ -404,62 +323,39 @@ async function runEdit() {
   fd.append("guidance_scale", String(clampFloat($("editGuidance").value, 0, 10, 1.0)));
 
   setStatus(`${model} 处理中...`);
-  const isAsync = model.includes("Edit") || model.includes("LongCat");
-
-  if (isAsync) {
-    const res = await apiFetch("async/images/edits", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}` },
-      body: fd,
-    });
-    const j = await readJsonSafely(res);
-    if (!res.ok || !j.task_id) {
-      setStatus(`${model} 失败`, "err");
-      addOutputItem({ title: `${model} 任务创建失败`, rawJson: j });
-      throw new Error("任务创建失败");
-    }
-
-    const taskId = j.task_id;
-    const result = await pollTask(taskId, apiKey, {
-      intervalMs: 6000,
-      onTick: (info) => setStatus(waitingStatusText(model, info.tick, info.elapsedMs)),
-    });
-
-    if (result.status !== "success") throw new Error(`任务失败: ${result.status}`);
-
-    const fileUrl = result.raw?.output?.file_url;
-    const { objUrl } = await fetchAsBlob(fileUrl);
-    const img = document.createElement("img");
-    img.src = objUrl;
-
-    addOutputItem({
-      title: `${model} 处理结果`,
-      element: img,
-      download: { href: objUrl, filename: `${model}-${nowTs()}.png` },
-      openUrl: $("editOpenUrl").checked ? fileUrl : null,
-    });
-    setStatus(`${model} 成功`, "ok");
-  } else {
-    const res = await apiFetch("images/generations", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}` },
-      body: fd,
-    });
-    const j = await readJsonSafely(res);
-    if (!res.ok) throw new Error(`API 错误 (${res.status})`);
-
-    const url = j.data?.[0]?.url || j.data?.[0]?.file_url || j.file_url;
-    const { objUrl } = await fetchAsBlob(url);
-    const img = document.createElement("img");
-    img.src = objUrl;
-
-    addOutputItem({
-      title: `${model} 处理结果`,
-      element: img,
-      download: { href: objUrl, filename: `${model}-${nowTs()}.png` },
-    });
-    setStatus(`${model} 成功`, "ok");
+  
+  const res = await apiFetch("async/images/edits", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: fd,
+  });
+  const j = await readJsonSafely(res);
+  if (!res.ok || !j.task_id) {
+    setStatus(`${model} 失败`, "err");
+    addOutputItem({ title: `${model} 任务创建失败`, rawJson: j });
+    throw new Error("任务创建失败");
   }
+
+  const taskId = j.task_id;
+  const result = await pollTask(taskId, apiKey, {
+    intervalMs: 6000,
+    onTick: (info) => setStatus(waitingStatusText(model, info.tick, info.elapsedMs)),
+  });
+
+  if (result.status !== "success") throw new Error(`任务失败: ${result.status}`);
+
+  const fileUrl = result.raw?.output?.file_url;
+  const { objUrl } = await fetchAsBlob(fileUrl);
+  const img = document.createElement("img");
+  img.src = objUrl;
+
+  addOutputItem({
+    title: `${model} 处理结果`,
+    element: img,
+    download: { href: objUrl, filename: `${model}-${nowTs()}.png` },
+    openUrl: $("editOpenUrl").checked ? fileUrl : null,
+  });
+  setStatus(`${model} 成功`, "ok");
 }
 
 // -------- 视频生成 (Wan 系列) --------
@@ -515,6 +411,10 @@ async function runWan() {
   const prompt = $("wanPrompt").value.trim();
   if (!prompt) throw new Error("请输入提示词");
 
+  if (model === "Wan2.2-I2V-A14B" && !img) {
+    throw new Error("Wan2.2-I2V-A14B 是图生视频模型，必须上传输入图片");
+  }
+
   const neg = $("wanNeg").value.trim();
   const width = clampInt($("wanW").value, 64, 2048, 832);
   const height = clampInt($("wanH").value, 64, 2048, 480);
@@ -545,7 +445,7 @@ async function runWan() {
     fd.append("num_inference_steps", String(steps));
     if (img) fd.append("image", img, img.name);
 
-    const endpoint = img ? "async/videos/image-to-video" : "async/videos/generations";
+    const endpoint = (model === "Wan2.2-I2V-A14B" || img) ? "async/videos/image-to-video" : "async/videos/generations";
     const res = await apiFetch(endpoint, {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}` },
@@ -625,7 +525,6 @@ function initUi() {
   $("btnZRun").onclick = async () => { try { await runTextToImage(); } catch (e) { addOutputItem({ title:"错误", meta:String(e) }); } };
   $("btnEditRun").onclick = async () => { try { await runEdit(); } catch (e) { addOutputItem({ title:"错误", meta:String(e) }); } };
   $("btnWanRun").onclick = async () => { try { await runWan(); } catch (e) { addOutputItem({ title:"错误", meta:String(e) }); } };
-  $("btnHyRun").onclick = async () => { try { await runHunyuanVideo(); } catch (e) { addOutputItem({ title:"错误", meta:String(e) }); } };
 
   $("btnClearOutput").onclick = clearOutput;
   $("btnWanApplyPreset").onclick = applyWanPreset;
