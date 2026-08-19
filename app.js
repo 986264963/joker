@@ -84,7 +84,11 @@ function clearRememberedKey() {
 }
 
 function showPanel(model) {
-  $("panelZ").style.display = model === "Qwen-Image-2512" ? "block" : "none";
+  const isZModel = (model === "z-image-turbo" || model === "Qwen-Image-2512");
+  $("panelZ").style.display = isZModel ? "block" : "none";
+  if (isZModel) {
+    $("zPanelTitle").textContent = `${model}（文生图 / Text-to-Image）`;
+  }
   $("panelEdit").style.display = model === "Edit-2511" ? "block" : "none";
   $("panelWan").style.display = model === "Wan2.2-I2V-A14B" ? "block" : "none";
   $("panelHunyuan").style.display = model === "HunyuanVideo-1.5" ? "block" : "none";
@@ -390,11 +394,12 @@ async function runHunyuanVideo() {
   }
 }
 
-// -------- Qwen-Image-2512 (文生图) --------
+// -------- 文生图（支持 z-image-turbo 和 Qwen-Image-2512） --------
 async function runZImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
+  const selectedModel = $("modelSel").value; // 获取当前选中的模型
   const prompt = $("zPrompt").value.trim();
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
@@ -402,7 +407,6 @@ async function runZImage() {
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}x${h}`;
 
-  // 随机种子：若输入 -1 或无效则自动随机生成
   const seedInput = Number.parseInt($("zSeed").value, 10);
   const seed = (Number.isFinite(seedInput) && seedInput >= 0) 
     ? seedInput 
@@ -412,12 +416,11 @@ async function runZImage() {
   const cfg = clampFloat($("zCfg").value, 0, 20, 1.0);
   const negativePrompt = $("zNeg").value.trim();
 
-  setStatus("Qwen-Image-2512 生成中... / Generating...");
+  setStatus(`${selectedModel} 生成中... / Generating...`);
   
-  // 严格对齐官方要求的 Payload 结构（关键：extra_body 内传递 width: 0, height: 0 解决 2048 报错）
   const payload = { 
     prompt, 
-    model: "Qwen-Image-2512", 
+    model: selectedModel, 
     n, 
     size,
     seed,
@@ -444,15 +447,15 @@ async function runZImage() {
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("Qwen-Image-2512 失败 / Failed", "err");
-    addOutputItem({ title: "Qwen-Image-2512 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    setStatus(`${selectedModel} 失败 / Failed`, "err");
+    addOutputItem({ title: `${selectedModel} 生成失败 / Failed`, rawJson: j, meta: `HTTP ${res.status}` });
     throw new Error(`API 错误 / API Error (${res.status})`);
   }
 
   const data = Array.isArray(j.data) ? j.data : [];
   if (!data.length) {
-    addOutputItem({ title: "Qwen-Image-2512 返回无数据 / Empty response", rawJson: j });
-    setStatus("Qwen-Image-2512 失败 / Failed", "err");
+    addOutputItem({ title: `${selectedModel} 返回无数据 / Empty response`, rawJson: j });
+    setStatus(`${selectedModel} 失败 / Failed`, "err");
     return;
   }
 
@@ -469,23 +472,23 @@ async function runZImage() {
       const blob = new Blob([bytes], { type: "image/png" });
       blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
     } else {
-      addOutputItem({ title: `Qwen-Image-2512 第${i+1}张无数据 / No image data`, rawJson: item });
+      addOutputItem({ title: `${selectedModel} 第${i+1}张无数据 / No image data`, rawJson: item });
       continue;
     }
 
     const img = document.createElement("img");
     img.src = blobInfo.objUrl;
 
-    const filename = `Qwen-Image-2512-${nowTs()}-${i+1}.png`;
+    const filename = `${selectedModel}-${nowTs()}-${i+1}.png`;
     addOutputItem({
-      title: `Qwen-Image-2512 输出 #${i+1} (Seed: ${seed})`,
+      title: `${selectedModel} 输出 #${i+1} (Seed: ${seed})`,
       meta: `size=${size} • n=${n} • seed=${seed} • steps=${steps}`,
       element: img,
       download: { href: blobInfo.objUrl, filename },
     });
   }
 
-  setStatus("Qwen-Image-2512 成功 / Success", "ok");
+  setStatus(`${selectedModel} 成功 / Success`, "ok");
 }
 
 // -------- Edit-2511 --------
@@ -833,7 +836,7 @@ function initUi() {
 
   $("btnZRun").onclick = async () => {
     try { await runZImage(); }
-    catch (e) { addOutputItem({ title:"Qwen-Image-2512 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title:"文生图错误 / Error", meta:String(e) }); }
   };
   $("btnEditRun").onclick = async () => {
     try { await runEdit(); }
