@@ -89,7 +89,7 @@
       <h2>2. 选择模型 / Select Model</h2>
       <div class="row">
         <select id="modelSel" class="input">
-          <option value="z-image">z-image（文生图 / Text-to-Image）</option>
+          <option value="Qwen-Image-2512">Qwen-Image-2512（文生图 / Text-to-Image）</option>
           <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
           <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
           <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
@@ -98,14 +98,14 @@
     </section>
 
     <section class="card model-panel" id="panelZ">
-      <h2>z-image（文生图 / Text-to-Image）</h2>
+      <h2>Qwen-Image-2512（文生图 / Text-to-Image）</h2>
 
       <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
       <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
 
       <div class="grid2">
         <div>
-          <label class="lab">分辨率 Resolution</label>
+          <label class="lab">分辨率 Resolution（支持 2048 高清）</label>
           <select id="zRes" class="input"></select>
         </div>
         <div>
@@ -114,9 +114,27 @@
         </div>
       </div>
 
+      <div class="grid3">
+        <div>
+          <label class="lab">步数 num_inference_steps</label>
+          <input id="zSteps" class="input" type="number" min="1" max="50" value="4" />
+        </div>
+        <div>
+          <label class="lab">引导系数 cfg_scale</label>
+          <input id="zCfg" class="input" type="number" min="0" max="20" step="0.5" value="1" />
+        </div>
+        <div>
+          <label class="lab">随机种子 seed (-1=随机)</label>
+          <input id="zSeed" class="input" type="number" value="-1" />
+        </div>
+      </div>
+
+      <label class="lab">负面提示词 Negative Prompt（可选）</label>
+      <textarea id="zNeg" class="textarea" rows="2" placeholder="指导模型避免生成所描述的内容"></textarea>
+
       <div class="hint">
-        建议：2048 更清晰但更慢更贵；n&gt;1 会输出多张。<br/>
-        Tip: 2048 is sharper but slower/more expensive; n&gt;1 outputs multiple images.
+        建议：支持 2048 高清分辨率，通过 extra_body 自动修正 width/height 报错。<br/>
+        Tip: 2048 resolution supported; extra_body width/height error fixed.
       </div>
 
       <div class="row">
