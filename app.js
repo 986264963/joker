@@ -1,16 +1,13 @@
 const $ = (id) => document.getElementById(id);
 
 const Z_RESOLUTIONS = {
-  "1:1 (2048*2048) [Pro推荐]": [2048, 2048],
-  "1:1 (1024*1024) [标准推荐]": [1024, 1024],
-  "16:9 (2688*1536) [Pro横屏]": [2688, 1536],
-  "9:16 (1536*2688) [Pro竖屏]": [1536, 2688],
-  "4:3 (2368*1728) [Pro大图]": [2368, 1728],
-  "3:4 (1728*2368) [Pro大图]": [1728, 2368],
-  "16:9 (1344*768) [标准横屏]": [1344, 768],
-  "9:16 (768*1344) [标准竖屏]": [768, 1344],
-  "3:2 (1248*832)": [1248, 832],
-  "2:3 (832*1248)": [832, 1248]
+  "1:1 (1024*1024)": [1024, 1024],
+  "9:16 (1152*2048)": [1152, 2048],
+  "16:9 (2048*1152)": [2048, 1152],
+  "4:3 (2048*1536)": [2048, 1536],
+  "3:4 (1536*2048)": [1536, 2048],
+  "3:2 (2048*1360)": [2048, 1360],
+  "2:3 (1360*2048)": [1360, 2048],
 };
 
 const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
@@ -70,13 +67,10 @@ function clearRememberedKey() {
   $("rememberKey").checked = false;
 }
 
-// 严格按照用户指定的模型白名单
+// 仅保留这两个文生图模型
 const T2I_MODELS = [
-  "Z-Image",
-  "Z-Image-Turbo",
   "Qwen-Image-2512",
-  "Qwen-Image-2.0-Pro",
-  "Qwen-Image-2.0"
+  "Z-Image-Turbo"
 ];
 const EDIT_MODELS = [
   "Qwen-Image-Edit-2511",
@@ -248,7 +242,7 @@ async function runTextToImage() {
   const n = clampInt($("zN").value, 1, 4, 1);
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   
-  // 核心修复：将尺寸分隔符从 'x' 改为 '*'
+  // 使用标准的 * 符号拼接尺寸，避免 400 报错
   const size = `${w}*${h}`;
 
   setStatus(`${model} 生成中...`);
