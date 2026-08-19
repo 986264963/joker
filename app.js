@@ -9,13 +9,8 @@ const Z_RESOLUTIONS = {
   "16:9 (2048*1152)": [2048, 1152],
   "9:16 (1152*2048)": [1152, 2048],
   "1:1 (1024*1024)": [1024, 1024],
-  "4:3 (1024*768)": [1024, 768],
-  "3:4 (768*1024)": [768, 1024],
   "16:9 (1024*576)": [1024, 576],
   "9:16 (576*1024)": [576, 1024],
-  "3:2 (1024*640)": [1024, 640],
-  "1:1 (512*512)": [512, 512],
-  "1:1 (256*256)": [256, 256],
 };
 
 const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
@@ -69,7 +64,6 @@ function showPanel(model) {
   if (isT2I) $("t2iTitle").textContent = `${model}（文生图）`;
   if (isEdit) $("editTitle").textContent = `${model}（图生图）`;
 
-  // 针对 Z-Image-Turbo 默认推荐 9 步，Qwen 推荐 4 步
   if (model === "Z-Image-Turbo") {
     $("zSteps").value = 9;
   } else if (model === "Qwen-Image-2512") {
@@ -183,7 +177,7 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
   return { status: "timeout", raw: { status:"timeout" } };
 }
 
-// -------- 文生图（核心修复：参数放入 extra_body） --------
+// -------- 文生图 --------
 async function runTextToImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -197,14 +191,12 @@ async function runTextToImage() {
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}*${h}`;
 
-  // 获取高级参数
   const steps = clampInt($("zSteps").value, 1, 50, 4);
   const cfg = clampFloat($("zCfg").value, 0, 20, 1);
-  const seed = clampInt($("zSeed").value, -1, 2147483647, 0);
+  const seed = clampInt($("zSeed").value, -1, 2147483647, -1);
 
   setStatus(`${model} 生成中...`);
 
-  // 严格按照官方 API 要求，将参数封装在 extra_body 中
   const payload = {
     prompt,
     model,
@@ -227,7 +219,6 @@ async function runTextToImage() {
     "Content-Type": "application/json"
   };
 
-  // 如果是 Z-Image-Turbo，带上官方截图中的 failover 请求头
   if (model === "Z-Image-Turbo") {
     headers["X-Failover-Enabled"] = "true";
   }
@@ -353,6 +344,13 @@ function initUi() {
     label.appendChild(input);
     label.appendChild(document.createTextNode(" " + t));
     box.appendChild(label);
+  }
+
+  // 绑定随机种子骰子按钮事件
+  if ($("btnRandSeed")) {
+    $("btnRandSeed").onclick = () => {
+      $("zSeed").value = Math.floor(Math.random() * 2147483647);
+    };
   }
 
   $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
