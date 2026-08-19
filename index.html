@@ -90,7 +90,7 @@
       <div class="row">
         <select id="modelSel" class="input">
           <option value="z-image">z-image（文生图 / Text-to-Image）</option>
-          <option value="Qwen-Image-2512">Qwen-Image-2512（文生图 / Text-to-Image）[span_2](start_span)[span_2](end_span)</option>
+          <option value="Qwen-Image-2512">Qwen-Image-2512（文生图 / Text-to-Image）</option>
           <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
           <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
           <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
@@ -98,6 +98,7 @@
       </div>
     </section>
 
+    <!-- z-image Panel -->
     <section class="card model-panel" id="panelZ">
       <h2>z-image（文生图 / Text-to-Image）</h2>
 
@@ -125,43 +126,45 @@
       </div>
     </section>
 
+    <!-- Qwen-Image-2512 Panel -->
     <section class="card model-panel" id="panelQwen">
-      <h2>Qwen-Image-2512（文生图 / Text-to-Image）[span_3](start_span)[span_3](end_span)</h2>
+      <h2>Qwen-Image-2512（文生图 / Text-to-Image）</h2>
 
-      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）[span_4](start_span)[span_4](end_span)</label>
-      <textarea id="qwenPrompt" class="textarea" rows="6" placeholder="例如：一副典雅庄重的对联悬挂于厅堂之中，房间是个安静古典的中式布置..."></textarea>
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="qwenPrompt" class="textarea" rows="6" placeholder="例如：一则典雅庄重的对联悬挂于厅堂之中..."></textarea>
 
-      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）[span_5](start_span)[span_5](end_span)</label>
-      <textarea id="qwenNeg" class="textarea" rows="3" placeholder="指导模型避免生成所描述的内容[span_6](start_span)[span_6](end_span)"></textarea>
-
-      <div class="grid3">
-        <div>
-          <label class="lab">分辨率 Resolution[span_7](start_span)[span_7](end_span)</label>
-          <select id="qwenRes" class="input"></select>
-        </div>
-        <div>
-          <label class="lab">采样步数 num_inference_steps (1-50)[span_8](start_span)[span_8](end_span)</label>
-          <input id="qwenSteps" class="input" type="number" min="1" max="50" value="4" />
-        </div>
-        <div>
-          <label class="lab">引导系数 cfg_scale (0-20)[span_9](start_span)[span_9](end_span)</label>
-          <input id="qwenCfg" class="input" type="number" min="0" max="20" step="0.5" value="1" />
-        </div>
-      </div>
+      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）</label>
+      <textarea id="qwenNeg" class="textarea" rows="3" placeholder="指导模型避免生成所描述的内容"></textarea>
 
       <div class="grid2">
         <div>
-          <label class="lab">随机种子 seed (-1=自动随机 / random)[span_10](start_span)[span_10](end_span)</label>
-          <input id="qwenSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
+          <label class="lab">分辨率 / Size</label>
+          <select id="qwenRes" class="input"></select>
         </div>
         <div>
-          <label class="lab">张数 n (1-4)[span_11](start_span)[span_11](end_span)</label>
+          <label class="lab">张数 n（1-4）</label>
           <input id="qwenN" class="input" type="number" min="1" max="4" value="1" />
         </div>
       </div>
 
+      <div class="grid3">
+        <div>
+          <label class="lab">num_inference_steps（1-50）</label>
+          <input id="qwenSteps" class="input" type="number" min="1" max="50" value="4" />
+        </div>
+        <div>
+          <label class="lab">cfg_scale（0-20）</label>
+          <input id="qwenGuidance" class="input" type="number" min="0" max="20" step="0.5" value="1" />
+        </div>
+        <div>
+          <label class="lab">seed（-1=随机 / random）</label>
+          <input id="qwenSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
+        </div>
+      </div>
+
       <div class="hint">
-        提示：完美适配高分辨率（如 1152x2048 / 2048x2048），已通过宽高等效参数映射彻底解决高分辨率报错问题[span_12](start_span)[span_12](end_span)；seed 设为 -1 时每次自动生成不同的随机种子，解决多次生成只返回同一张图的问题[span_13](start_span)[span_13](end_span)。
+        说明：支持高分辨率（如 2048x2048），内置参数校验与随机种子处理，有效避免多次生成同一张图及高分辨率参数报错。<br/>
+        EN: Supports high-res and random seed to ensure varied generations.
       </div>
 
       <div class="row">
@@ -169,6 +172,7 @@
       </div>
     </section>
 
+    <!-- Edit-2511 Panel -->
     <section class="card model-panel" id="panelEdit">
       <h2>Edit-2511（图像编辑 / Image Edit）</h2>
 
@@ -214,6 +218,7 @@
       </div>
     </section>
 
+    <!-- Wan2.2 Panel -->
     <section class="card model-panel" id="panelWan">
       <h2>Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</h2>
 
@@ -314,6 +319,7 @@
       </div>
     </section>
 
+    <!-- HunyuanVideo Panel -->
     <section class="card model-panel" id="panelHunyuan">
       <h2>HunyuanVideo-1.5（文生视频 / Text-to-Video）</h2>
 
