@@ -1,393 +1,978 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Image View</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <header class="topbar">
-    <div class="topbar-main">
-      <div class="topbar-left">
-        <div class="brand-mark">M</div>
-        <div class="h1">Image View</div>
-      </div>
+// Moark Web (Cloudflare Pages/Workers)
+// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
+// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
 
-      <div class="topbar-right">
-        <a
-          class="top-icon-btn"
-          href="https://github.com/MallocPointer/gitee/"
-          target="_blank"
-          rel="noopener"
-          aria-label="GitHub 仓库"
-          title="GitHub 仓库"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.11.79-.25.79-.56v-2.16c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.68-1.27-1.68-1.04-.72.08-.71.08-.71 1.15.08 1.75 1.18 1.75 1.18 1.02 1.75 2.67 1.25 3.32.96.1-.74.4-1.25.72-1.54-2.56-.29-5.25-1.28-5.25-5.72 0-1.27.46-2.3 1.19-3.12-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.19 1.19a11.1 11.1 0 0 1 5.8 0c2.22-1.5 3.19-1.19 3.19-1.19.63 1.58.23 2.75.11 3.04.74.82 1.19 1.85 1.19 3.12 0 4.45-2.7 5.43-5.28 5.72.41.35.78 1.05.78 2.11v3.12c0 .31.21.68.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/>
-          </svg>
-          <span>GitHub</span>
-        </a>
+const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
+const $ = (id) => document.getElementById(id);
 
-        <button
-          class="top-icon-btn coffee-btn"
-          id="donateBtn"
-          type="button"
-          aria-label="赞助项目"
-          title="赞助项目"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="currentColor" d="M3 6.5A2.5 2.5 0 0 1 5.5 4h9A2.5 2.5 0 0 1 17 6.5V7h1.75A3.25 3.25 0 0 1 22 10.25c0 1.64-1.23 3.02-2.86 3.21A5.5 5.5 0 0 1 13.75 18h-6.5A5.25 5.25 0 0 1 2 12.75V6.5Zm14 2V11a1.75 1.75 0 0 0 0-3.5H17Z"/>
-            <path fill="currentColor" d="M6 20a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2H7a1 1 0 0 1-1-1Z"/>
-          </svg>
-          <span>赞助</span>
-        </button>
+const Z_RESOLUTIONS = {
+  "1:1 (2048x2048)": [2048, 2048],
+  "1:1 (1024x1024)": [1024, 1024],
+  "3:4 (768x1024)": [768, 1024],
+  "4:3 (1024x768)": [1024, 768],
+  "16:9 (1024x576)": [1024, 576],
+  "9:16 (576x1024)": [576, 1024],
+};
 
-        <div class="status">
-          <span class="badge" id="statusBadge">准备就绪 / Ready</span>
-        </div>
-      </div>
-    </div>
+const QWEN_RESOLUTIONS = {
+  "9:16 (1152x2048)": [1152, 2048],
+  "16:9 (2048x1152)": [2048, 1152],
+  "1:1 (2048x2048)": [2048, 2048],
+  "1:1 (1024x1024)": [1024, 1024],
+  "3:4 (1152x1536)": [1152, 1536],
+  "4:3 (1536x1152)": [1536, 1152],
+};
 
-    <div class="topbar-sub">
-      <span class="api-label">API 注册地址:</span>
-      <span class="mono api-link">https://ai.gitee.com/serverless-api</span>
-    </div>
-  </header>
+const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
 
-  <div class="donate-modal" id="donateModal" aria-hidden="true">
-    <div class="donate-mask" id="donateMask"></div>
-    <div class="donate-panel" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
-      <button class="donate-close" id="donateClose" type="button" aria-label="关闭">×</button>
-      <div class="donate-eyebrow">Support this project</div>
-      <h3 id="donateTitle">Buy me a coffee</h3>
-      <p class="donate-text">
-        如果真的帮助到了你，请为我打赏一杯咖啡吧，有了你的赞助，我会将服务一直运行下去的。 我的联系方式：admin@airymoon.com。 项目开源地址：https://github.com/MallocPointer/gitee/
-      </p>
-      <img class="donate-image" src="./image.png" alt="项目赞助收款码" />
-      <a class="btn primary donate-download" href="./image.png" target="_blank" rel="noopener">打开收款码</a>
-    </div>
-  </div>
+const WAN_RES_PRESETS = {
+  "480p 横屏 / 832x480 (推荐 / Recommended)": [832, 480],
+  "480p 竖屏 / 480x832": [480, 832],
+  "720p 横屏 / 1280x720": [1280, 720],
+  "720p 竖屏 / 720x1280": [720, 1280],
+  "1024 方图 / 1024x1024": [1024, 1024],
+  "2048 方图 / 2048x2048 (高成本 / Expensive)": [2048, 2048],
+};
 
-  <main class="container">
-    <section class="card">
-      <h2>1. 输入 API Key / Enter API Key</h2>
-      <div class="row">
-        <input id="apiKey" class="input" placeholder="Bearer Token" />
-        <label class="chk">
-          <input type="checkbox" id="rememberKey" />
-          记住（localStorage）
-        </label>
-        <button class="btn" id="btnClearKey">清除</button>
-      </div>
-      <div class="hint">
-        提示：本工具默认通过同站点的 <span class="mono">/api/*</span> 代理转发到 <span class="mono">https://ai.gitee.com/v1</span>，避免浏览器 CORS 限制。
-      </div>
-    </section>
+function nowTs() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
 
-    <section class="card">
-      <h2>2. 选择模型 / Select Model</h2>
-      <div class="row">
-        <select id="modelSel" class="input">
-          <option value="z-image-turbo">z-image-turbo（文生图 / Text-to-Image）</option>
-          <option value="Qwen-Image-2512">Qwen-Image-2512（文生图 / Text-to-Image）</option>
-          <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
-          <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
-          <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
-        </select>
-      </div>
-    </section>
+function setStatus(text, kind="info") {
+  const badge = $("statusBadge");
+  if (!badge) return;
 
-    <section class="card model-panel" id="panelZ">
-      <h2 id="zPanelTitle">文生图模型配置 (Text-to-Image)</h2>
+  badge.textContent = text;
+  badge.style.borderColor =
+    kind === "ok" ? "rgba(37,194,160,.7)" :
+    kind === "err" ? "rgba(255,84,112,.75)" :
+    "rgba(255,255,255,.10)";
 
-      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
-      <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
+  badge.style.background =
+    kind === "ok" ? "rgba(37,194,160,.10)" :
+    kind === "err" ? "rgba(255,84,112,.10)" :
+    "rgba(255,255,255,.06)";
+}
 
-      <div class="grid2">
-        <div>
-          <label class="lab">分辨率 Resolution（支持 2048 高清）</label>
-          <select id="zRes" class="input"></select>
-        </div>
-        <div>
-          <label class="lab">张数 n（1-4）</label>
-          <input id="zN" class="input" type="number" min="1" max="4" value="1" />
-        </div>
-      </div>
+function waitingStatusText(label, tick, elapsedMs, extra="") {
+  const sec = Math.floor(elapsedMs / 1000);
+  const extraText = extra ? ` • ${extra}` : "";
+  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查${extraText} • 正常等待，并非卡死`;
+}
 
-      <div class="grid3">
-        <div>
-          <label class="lab">步数 num_inference_steps</label>
-          <input id="zSteps" class="input" type="number" min="1" max="50" value="4" />
-        </div>
-        <div>
-          <label class="lab">引导系数 cfg_scale</label>
-          <input id="zCfg" class="input" type="number" min="0" max="20" step="0.5" value="1" />
-        </div>
-        <div>
-          <label class="lab">随机种子 seed (-1=随机)</label>
-          <input id="zSeed" class="input" type="number" value="-1" />
-        </div>
-      </div>
+function getApiKey() {
+  const key = $("apiKey").value.trim();
+  if (!key) throw new Error("请输入 API Key / Please enter API Key");
+  return key;
+}
 
-      <label class="lab">负面提示词 Negative Prompt（可选）</label>
-      <textarea id="zNeg" class="textarea" rows="2" placeholder="指导模型避免生成所描述的内容"></textarea>
+function rememberKeyMaybe() {
+  const key = $("apiKey").value.trim();
+  if ($("rememberKey").checked && key) {
+    localStorage.setItem("moark_api_key", key);
+  }
+}
 
-      <div class="hint">
-        建议：支持 2048 高清分辨率，通过 extra_body 自动修正 width/height 报错。<br/>
-        Tip: 2048 resolution supported; extra_body width/height error fixed.
-      </div>
+function loadRememberedKey() {
+  const key = localStorage.getItem("moark_api_key") || "";
+  if (key) {
+    $("apiKey").value = key;
+    $("rememberKey").checked = true;
+  }
+}
 
-      <div class="row">
-        <button class="btn primary" id="btnZRun">执行 / Generate</button>
-      </div>
-    </section>
+function clearRememberedKey() {
+  localStorage.removeItem("moark_api_key");
+  $("apiKey").value = "";
+  $("rememberKey").checked = false;
+}
 
-    <section class="card model-panel" id="panelEdit">
-      <h2>Edit-2511（图像编辑 / Image Edit）</h2>
+function showPanel(model) {
+  $("panelZ").style.display = model === "z-image" ? "block" : "none";
+  $("panelQwen").style.display = model === "Qwen-Image-2512" ? "block" : "none";
+  $("panelEdit").style.display = model === "Edit-2511" ? "block" : "none";
+  $("panelWan").style.display = model === "Wan2.2-I2V-A14B" ? "block" : "none";
+  $("panelHunyuan").style.display = model === "HunyuanVideo-1.5" ? "block" : "none";
+}
 
-      <div class="grid2">
-        <div>
-          <label class="lab">图1 Image 1</label>
-          <input id="editImg1" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
-        </div>
-        <div>
-          <label class="lab">图2 Image 2</label>
-          <input id="editImg2" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
-        </div>
-      </div>
+function addOutputItem({title, kind="info", meta="", element=null, rawJson=null, download=null, openUrl=null}) {
+  const out = $("output");
+  const box = document.createElement("div");
+  box.className = "item";
 
-      <label class="lab">提示词 Prompt</label>
-      <textarea id="editPrompt" class="textarea" rows="5" placeholder="描述你要的编辑效果（例如：把背景换成海边日落，保留人物）"></textarea>
+  const h = document.createElement("h3");
+  h.textContent = title;
+  box.appendChild(h);
 
-      <label class="lab">任务类型 Task Types（可多选 / Multi-select）</label>
-      <div class="checks" id="editTaskTypes"></div>
+  if (meta) {
+    const m = document.createElement("div");
+    m.className = "meta";
+    m.textContent = meta;
+    box.appendChild(m);
+  }
 
-      <div class="grid2">
-        <div>
-          <label class="lab">steps num_inference_steps（1-50）</label>
-          <input id="editSteps" class="input" type="number" min="1" max="50" value="4" />
-        </div>
-        <div>
-          <label class="lab">guidance_scale（0-10）</label>
-          <input id="editGuidance" class="input" type="number" min="0" max="10" step="0.5" value="1" />
-        </div>
-      </div>
+  if (element) box.appendChild(element);
 
-      <label class="chk">
-        <input type="checkbox" id="editOpenUrl" />
-        完成后浏览器打开 file_url / Open in browser after done
-      </label>
+  if (rawJson) {
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(rawJson, null, 2);
+    box.appendChild(pre);
 
-      <div class="hint">
-        Notes: Higher steps = slower but more detail; higher guidance = follows prompt more strongly.
-      </div>
+    const btns = document.createElement("div");
+    btns.className = "row";
+    const b = document.createElement("button");
+    b.className = "btn";
+    b.textContent = "下载 JSON / Download JSON";
+    b.onclick = () => downloadBlob(new Blob([pre.textContent], {type:"application/json"}), `${title}_${nowTs()}.json`);
+    btns.appendChild(b);
+    box.appendChild(btns);
+  }
 
-      <div class="row">
-        <button class="btn primary" id="btnEditRun">执行 / Run</button>
-      </div>
-    </section>
+  if (download) {
+    const btn = document.createElement("a");
+    btn.className = "btn";
+    btn.textContent = "下载 / Download";
+    btn.href = download.href;
+    btn.download = download.filename || "";
+    btn.target = "_blank";
+    btn.rel = "noopener";
+    const row = document.createElement("div");
+    row.className = "row";
+    row.appendChild(btn);
 
-    <section class="card model-panel" id="panelWan">
-      <h2>Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</h2>
+    if (openUrl) {
+      const b2 = document.createElement("a");
+      b2.className = "btn";
+      b2.textContent = "打开 file_url";
+      b2.href = openUrl;
+      b2.target = "_blank";
+      b2.rel = "noopener";
+      row.appendChild(b2);
+    }
+    box.appendChild(row);
+  } else if (openUrl) {
+    const row = document.createElement("div");
+    row.className = "row";
+    const b2 = document.createElement("a");
+    b2.className = "btn";
+    b2.textContent = "打开 file_url";
+    b2.href = openUrl;
+    b2.target = "_blank";
+    b2.rel = "noopener";
+    row.appendChild(b2);
+    box.appendChild(row);
+  }
 
-      <label class="lab">输入图片 Image</label>
-      <input id="wanImg" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
+  out.prepend(box);
+  return box;
+}
 
-      <label class="lab">提示词 Prompt</label>
-      <textarea id="wanPrompt" class="textarea" rows="5" placeholder="描述视频风格/动作（例如：镜头缓慢推进，微风吹动头发，电影感）"></textarea>
+function clearOutput() {
+  $("output").innerHTML = "";
+}
 
-      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）</label>
-      <textarea id="wanNeg" class="textarea" rows="3" placeholder="例如：lowres, blurry, watermark"></textarea>
+// Same-origin proxy to ai.gitee.com/v1
+async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
+  const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
+    method,
+    headers,
+    body,
+    signal,
+  });
+  return res;
+}
 
-      <div class="grid3">
-        <div>
-          <label class="lab">预设 Preset</label>
-          <select id="wanPreset" class="input">
-            <option>标准 / Standard</option>
-            <option>更清晰 / Sharper</option>
-            <option>更动感 / More motion</option>
-            <option>更快 / Faster</option>
-          </select>
-        </div>
-        <div class="row-inline">
-          <button class="btn" id="btnWanApplyPreset">应用预设 / Apply</button>
-        </div>
-      </div>
+// Download proxy for arbitrary file_url/image urls to avoid CORS
+async function dlFetch(url, {signal=null}={}) {
+  const u = `/dl?url=${encodeURIComponent(url)}`;
+  const res = await fetch(u, {method:"GET", signal});
+  return res;
+}
 
-      <div class="grid3">
-        <div>
-          <label class="lab">分辨率预设 Resolution</label>
-          <select id="wanResPreset" class="input"></select>
-        </div>
-        <div>
-          <label class="lab">width 宽（64-2048）</label>
-          <input id="wanW" class="input" type="number" min="64" max="2048" step="8" value="832" />
-        </div>
-        <div>
-          <label class="lab">height 高（64-2048）</label>
-          <input id="wanH" class="input" type="number" min="64" max="2048" step="8" value="480" />
-        </div>
-      </div>
+async function readJsonSafely(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { _text: text };
+  }
+}
 
-      <div class="grid3">
-        <div>
-          <label class="lab">num_inference_steps（1-100）</label>
-          <input id="wanSteps" class="input" type="number" min="1" max="100" value="30" />
-        </div>
-        <div>
-          <label class="lab">guidance_scale（0-20）</label>
-          <input id="wanGuidance" class="input" type="number" min="0" max="20" step="0.5" value="5" />
-        </div>
-        <div>
-          <label class="lab">seed（-1=随机 / random）</label>
-          <input id="wanSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
-        </div>
-      </div>
+function clampInt(v, lo, hi, defv) {
+  const n = Number.parseInt(String(v), 10);
+  if (Number.isFinite(n)) return Math.max(lo, Math.min(hi, n));
+  return defv;
+}
 
-      <div class="grid3">
-        <label class="chk"><input type="checkbox" id="wanWatermark" /> watermark 水印</label>
-        <label class="chk"><input type="checkbox" id="wanPromptExtend" /> prompt_extend 自动扩写</label>
-        <label class="chk"><input type="checkbox" id="wanOpenUrl" /> 完成后浏览器打开 file_url</label>
-      </div>
+function clampFloat(v, lo, hi, defv) {
+  const n = Number.parseFloat(String(v));
+  if (Number.isFinite(n)) return Math.max(lo, Math.min(hi, n));
+  return defv;
+}
 
-      <div class="grid3">
-        <div>
-          <label class="lab">帧率 FPS（1-60）</label>
-          <input id="wanFps" class="input" type="number" min="1" max="60" value="24" />
-        </div>
-        <div>
-          <label class="lab">总时长 Duration 秒（0.5-60）</label>
-          <input id="wanDuration" class="input" type="number" min="0.5" max="60" step="0.5" value="5" />
-        </div>
-        <div>
-          <label class="lab">num_frames（1-300）</label>
-          <input id="wanFrames" class="input" type="number" min="1" max="300" value="30" />
-        </div>
-      </div>
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
 
-      <div class="row">
-        <label class="chk">
-          <input type="checkbox" id="wanAutoFrames" checked />
-          num_frames 自动 = FPS×5s（推荐 / Auto）
-        </label>
-        <label class="chk">
-          <input type="checkbox" id="wanZipSegments" />
-          生成多段时：一键打包下载（zip）
-        </label>
-      </div>
+async function fetchAsBlob(url, kindHint="file") {
+  const r = await dlFetch(url);
+  if (!r.ok) {
+    const j = await readJsonSafely(r);
+    throw new Error(`下载失败 / Download failed (${r.status}): ${JSON.stringify(j).slice(0, 240)}`);
+  }
+  const blob = await r.blob();
+  const objUrl = URL.createObjectURL(blob);
+  return { blob, objUrl };
+}
 
-      <div class="hint">
-        说明：若服务端单次只能生成固定 5 秒，本工具会按你指定的 Duration 分段生成并下载。<br/>
-        注意：浏览器端无法像桌面版那样用 ffmpeg 合并/裁剪成“一个最终 mp4”；因此多段会分别提供可播放与下载（也可勾选 zip 打包下载）。<br/>
-        EN: If backend returns fixed-length clips, we generate segments and provide playable/downloadable mp4s (optionally zip).
-      </div>
+// Poll task status
+async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, onTick=null}={}) {
+  const start = Date.now();
+  let tick = 0;
 
-      <div class="row">
-        <button class="btn primary" id="btnWanRun">执行 / Generate Video</button>
-      </div>
-    </section>
+  while (Date.now() - start < timeoutMs) {
+    tick++;
+    const elapsedMs = Date.now() - start;
 
-    <section class="card model-panel" id="panelHunyuan">
-      <h2>HunyuanVideo-1.5（文生视频 / Text-to-Video）</h2>
-
-      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
-      <textarea id="hyPrompt" class="textarea" rows="6" placeholder="例如：年轻的中国女性穿着传统红色古装，轻轻撩起头纱，特写镜头，浅景深，暖色调"></textarea>
-
-      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）</label>
-      <textarea id="hyNeg" class="textarea" rows="3" placeholder="例如：lowres, blurry, watermark"></textarea>
-
-      <div class="grid3">
-        <div>
-          <label class="lab">画面比例 Aspect Ratio</label>
-          <select id="hyAspect" class="input">
-            <option value="16:9">16:9</option>
-            <option value="9:16">9:16</option>
-            <option value="1:1">1:1</option>
-          </select>
-        </div>
-        <div>
-          <label class="lab">steps num_inferenece_steps（1-10）</label>
-          <input id="hySteps" class="input" type="number" min="1" max="10" value="10" />
-        </div>
-        <div>
-          <label class="lab">fps（1-24）</label>
-          <input id="hyFps" class="input" type="number" min="1" max="24" value="24" />
-        </div>
-      </div>
-
-      <div class="grid3">
-        <div>
-          <label class="lab">num_frames（81-241）</label>
-          <input id="hyFrames" class="input" type="number" min="81" max="241" value="241" />
-        </div>
-        <div>
-          <label class="lab">seed（正整数 / positive integer）</label>
-          <input id="hySeed" class="input" type="number" min="1" max="2147483647" value="1" />
-        </div>
-        <label class="chk">
-          <input type="checkbox" id="hyOpenUrl" />
-          完成后浏览器打开 file_url / Open in browser after done
-        </label>
-      </div>
-
-      <div class="hint">
-        说明：这是异步任务接口，会先返回 task_id，然后自动轮询状态直至 success/failed。<br/>
-        EN: This is an async endpoint; we create a task, then poll status until success/failed.
-      </div>
-
-      <div class="row">
-        <button class="btn primary" id="btnHyRun">执行 / Generate Video</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <div class="row row-between">
-        <h2>输出 / Output</h2>
-        <div class="row-inline">
-          <button class="btn" id="btnClearOutput">清空输出</button>
-        </div>
-      </div>
-      <div id="output" class="output"></div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <div class="mono">Powered by Cloudflare Pages Functions proxy • 请使用者自觉遵守所在国家的法律，切勿触犯法律界限 • Please consciously comply with the laws of your country and do not cross legal boundaries.</div>
-  </footer>
-
-  <script src="./app.js"></script>
-  <script>
-    (function () {
-      const donateBtn = document.getElementById("donateBtn");
-      const donateModal = document.getElementById("donateModal");
-      const donateMask = document.getElementById("donateMask");
-      const donateClose = document.getElementById("donateClose");
-
-      if (!donateBtn || !donateModal || !donateMask || !donateClose) return;
-
-      const openDonate = () => {
-        donateModal.classList.add("show");
-        donateModal.setAttribute("aria-hidden", "false");
-        document.body.classList.add("modal-open");
-      };
-
-      const closeDonate = () => {
-        donateModal.classList.remove("show");
-        donateModal.setAttribute("aria-hidden", "true");
-        document.body.classList.remove("modal-open");
-      };
-
-      donateBtn.addEventListener("click", openDonate);
-      donateMask.addEventListener("click", closeDonate);
-      donateClose.addEventListener("click", closeDonate);
-
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && donateModal.classList.contains("show")) {
-          closeDonate();
-        }
+    if (onTick) {
+      onTick({
+        tick,
+        elapsedMs,
       });
-    })();
-  </script>
-</body>
-</html>
+    }
+
+    const res = await apiFetch(`task/${encodeURIComponent(taskId)}`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${apiKey}` },
+    });
+    const j = await readJsonSafely(res);
+    const st = j.status || "unknown";
+    if (st === "success" || st === "failed" || st === "cancelled") {
+      return { status: st, raw: j };
+    }
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+
+  return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
+}
+
+
+// -------- HunyuanVideo-1.5 (Text-to-Video) --------
+async function runHunyuanVideo() {
+  const apiKey = getApiKey();
+  rememberKeyMaybe();
+
+  const prompt = $("hyPrompt").value.trim();
+  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+
+  const negative_prompt = $("hyNeg").value.trim();
+
+  const aspect_ratio = $("hyAspect").value;
+  const num_inferenece_steps = clampInt($("hySteps").value, 1, 10, 10);
+  const num_frames = clampInt($("hyFrames").value, 81, 241, 241);
+
+  // seed must be positive integer
+  const seedRaw = $("hySeed").value;
+  const seed = Number.parseInt(String(seedRaw), 10);
+  if (!Number.isFinite(seed) || seed <= 0) {
+    throw new Error("seed 必须是正整数 / seed must be a positive integer");
+  }
+
+  const fps = clampInt($("hyFps").value, 1, 24, 24);
+  const openAfter = $("hyOpenUrl").checked;
+
+  // Compose payload (keep server field name: num_inferenece_steps)
+  const payload = {
+    prompt,
+    model: "HunyuanVideo-1.5",
+    aspect_ratio,
+    negative_prompt,
+    num_inferenece_steps,
+    num_frames,
+    seed,
+    fps,
+  };
+
+  setStatus("HunyuanVideo 创建任务... / Creating task...");
+  const res = await apiFetch("async/videos/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const j = await readJsonSafely(res);
+  if (!res.ok) {
+    setStatus("HunyuanVideo 失败 / Failed", "err");
+    addOutputItem({
+      title: "HunyuanVideo 创建任务失败 / Create task failed",
+      meta: `HTTP ${res.status}`,
+      rawJson: j,
+    });
+    throw new Error(`API 错误 / API Error (${res.status})`);
+  }
+
+  const taskId = j.task_id;
+  if (!taskId) {
+    setStatus("HunyuanVideo 失败 / Failed", "err");
+    addOutputItem({
+      title: "HunyuanVideo 未返回 task_id / Missing task_id",
+      rawJson: j,
+    });
+    throw new Error("Task ID not found in response");
+  }
+
+  addOutputItem({
+    title: "HunyuanVideo 任务已创建 / Task created",
+    meta: `task_id=${taskId} • aspect_ratio=${aspect_ratio} • frames=${num_frames} • fps=${fps} • steps=${num_inferenece_steps} • seed=${seed}`,
+    rawJson: j,
+    openUrl: openAfter ? `https://ai.gitee.com/v1/task/${encodeURIComponent(taskId)}` : null,
+  });
+
+  setStatus("HunyuanVideo 任务已创建，开始轮询...");
+  const result = await pollTask(taskId, apiKey, {
+    intervalMs: 10 * 1000,
+    timeoutMs: 30 * 60 * 1000,
+    onTick: (info) => {
+      setStatus(waitingStatusText("HunyuanVideo", info.tick, info.elapsedMs));
+    },
+  });
+
+  const st = result.status;
+  const raw = result.raw || {};
+
+  if (st !== "success") {
+    setStatus(`HunyuanVideo ${st} / ${st}`, st === "failed" ? "err" : "info");
+    addOutputItem({
+      title: `HunyuanVideo 任务结束：${st} / Task ended: ${st}`,
+      rawJson: raw,
+      meta: `task_id=${taskId}`,
+    });
+    return;
+  }
+
+  // success
+  const fileUrl = raw?.output?.file_url;
+  const textRes = raw?.output?.text_result;
+
+  if (fileUrl) {
+    const blobInfo = await fetchAsBlob(fileUrl, "video");
+    const video = document.createElement("video");
+    video.src = blobInfo.objUrl;
+    video.controls = true;
+    video.playsInline = true;
+
+    addOutputItem({
+      title: "HunyuanVideo 输出 / Output",
+      meta: `task_id=${taskId} • file_url=${fileUrl}`,
+      element: video,
+      rawJson: raw,
+      download: { href: blobInfo.objUrl, filename: `hunyuan-video-${nowTs()}.mp4` },
+      openUrl: openAfter ? fileUrl : null,
+    });
+
+    setStatus("HunyuanVideo 成功 / Success", "ok");
+  } else if (textRes) {
+    addOutputItem({
+      title: "HunyuanVideo 文本输出 / Text output",
+      meta: `task_id=${taskId}`,
+      rawJson: raw,
+    });
+    setStatus("HunyuanVideo 成功 / Success", "ok");
+  } else {
+    addOutputItem({
+      title: "HunyuanVideo 成功但无输出 / Success but no output",
+      meta: `task_id=${taskId}`,
+      rawJson: raw,
+    });
+    setStatus("HunyuanVideo 成功 / Success", "ok");
+  }
+}
+
+// -------- z-image --------
+async function runZImage() {
+  const apiKey = getApiKey();
+  rememberKeyMaybe();
+
+  const prompt = $("zPrompt").value.trim();
+  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+
+  const n = clampInt($("zN").value, 1, 4, 1);
+  const [w, h] = Z_RESOLUTIONS[$("zRes").value];
+  const size = `${w}x${h}`;
+
+  setStatus("z-image 生成中... / Generating...");
+  const payload = { prompt, model: "z-image-turbo", n, size };
+
+  const res = await apiFetch("images/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const j = await readJsonSafely(res);
+  if (!res.ok) {
+    setStatus("z-image 失败 / Failed", "err");
+    addOutputItem({ title: "z-image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`API 错误 / API Error (${res.status})`);
+  }
+
+  // Expect OpenAI-like: { data: [ { url | b64_json } ] }
+  const data = Array.isArray(j.data) ? j.data : [];
+  if (!data.length) {
+    addOutputItem({ title: "z-image 返回无数据 / Empty response", rawJson: j });
+    setStatus("z-image 失败 / Failed", "err");
+    return;
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i] || {};
+    let blobInfo = null;
+
+    if (item.url) {
+      blobInfo = await fetchAsBlob(item.url, "image");
+    } else if (item.b64_json) {
+      const byteChars = atob(item.b64_json);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
+      const blob = new Blob([bytes], { type: "image/png" });
+      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
+    } else {
+      addOutputItem({ title: `z-image 第${i+1}张无数据 / No image data`, rawJson: item });
+      continue;
+    }
+
+    const img = document.createElement("img");
+    img.src = blobInfo.objUrl;
+
+    const filename = `z-image-${nowTs()}-${i+1}.png`;
+    addOutputItem({
+      title: `z-image 输出 #${i+1}`,
+      meta: `size=${size}, n=${n}`,
+      element: img,
+      download: { href: blobInfo.objUrl, filename },
+    });
+  }
+
+  setStatus("z-image 成功 / Success", "ok");
+}
+
+// -------- Qwen-Image-2512 --------[span_14](start_span)[span_14](end_span)
+async function runQwenImage2512() {
+  const apiKey = getApiKey();
+  rememberKeyMaybe();
+
+  const prompt = $("qwenPrompt").value.trim();
+  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+
+  const negative_prompt = $("qwenNeg").value.trim();
+  const n = clampInt($("qwenN").value, 1, 4, 1);
+  const [w, h] = QWEN_RESOLUTIONS[$("qwenRes"].value] || [1152, 2048];
+  const size = `${w}x${h}`;
+
+  const num_inference_steps = clampInt($("qwenSteps").value, 1, 50, 4);
+  const cfg_scale = clampFloat($("qwenCfg").value, 0, 20, 1.0);
+
+  let seedVal = clampInt($("qwenSeed").value, -1, 2147483647, -1);
+  // 解决多次生成只返回同一张图的问题：若 seed 为 -1，则自动生成一个随机正整数
+  const seed = seedVal === -1 ? Math.floor(Math.random() * 2147483647) : seedVal;
+
+  setStatus("Qwen-Image-2512 生成中... / Generating...");[span_15](start_span)[span_15](end_span)
+  
+  // 严格按照 Gitee AI 官方接口规范传递高分辨率 width/height 及 extra_body 参数[span_16](start_span)[span_16](end_span)
+  const payload = {
+    prompt,
+    model: "Qwen-Image-2512",
+    n,
+    size,
+    extra_body: {
+      width: w,
+      height: h,
+      num_inference_steps,
+      cfg_scale,
+      seed,
+      negative_prompt,
+      lora_weights: [],
+      lora_scale: 0
+    }
+  };
+
+  const res = await apiFetch("images/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const j = await readJsonSafely(res);
+  if (!res.ok) {
+    setStatus("Qwen-Image-2512 失败 / Failed", "err");
+    addOutputItem({ title: "Qwen-Image-2512 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`API 错误 / API Error (${res.status})`);
+  }
+
+  const data = Array.isArray(j.data) ? j.data : [];
+  if (!data.length) {
+    addOutputItem({ title: "Qwen-Image-2512 返回无数据 / Empty response", rawJson: j });
+    setStatus("Qwen-Image-2512 失败 / Failed", "err");
+    return;
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i] || {};
+    let blobInfo = null;
+
+    if (item.url) {
+      blobInfo = await fetchAsBlob(item.url, "image");
+    } else if (item.b64_json) {
+      const byteChars = atob(item.b64_json);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
+      const blob = new Blob([bytes], { type: "image/png" });
+      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
+    } else {
+      addOutputItem({ title: `Qwen-Image-2512 第${i+1}张无数据 / No image data`, rawJson: item });
+      continue;
+    }
+
+    const img = document.createElement("img");
+    img.src = blobInfo.objUrl;
+
+    const filename = `Qwen-Image-2512-${nowTs()}-${i+1}.png`;
+    addOutputItem({
+      title: `Qwen-Image-2512 输出 #${i+1}`,
+      meta: `size=${size}, seed=${seed}, steps=${num_inference_steps}`,
+      element: img,
+      download: { href: blobInfo.objUrl, filename },
+      rawJson: { prompt, size, seed, num_inference_steps, cfg_scale, negative_prompt }
+    });
+  }
+
+  setStatus("Qwen-Image-2512 成功 / Success", "ok");
+}
+
+// -------- Edit-2511 --------
+async function runEdit() {
+  const apiKey = getApiKey();
+  rememberKeyMaybe();
+
+  const f1 = $("editImg1").files?.[0];
+  const f2 = $("editImg2").files?.[0];
+  const prompt = $("editPrompt").value.trim();
+  if (!f1 || !f2 || !prompt) throw new Error("请上传2张图片并输入提示词 / Please provide 2 images and prompt");
+
+  const taskTypes = Array.from(document.querySelectorAll("input[name='editTaskType']:checked")).map(x => x.value);
+  if (!taskTypes.length) throw new Error("至少选择一个 task_types / Choose at least one task type");
+
+  const steps = clampInt($("editSteps").value, 1, 50, 4);
+  const guidance = clampFloat($("editGuidance").value, 0, 10, 1.0);
+
+  const fd = new FormData();
+  fd.append("prompt", prompt);
+  fd.append("model", "Qwen-Image-Edit-2511");
+  fd.append("num_inference_steps", String(steps));
+  fd.append("guidance_scale", String(guidance));
+  for (const t of taskTypes) fd.append("task_types", t);
+  fd.append("image", f1, f1.name);
+  fd.append("image", f2, f2.name);
+
+  setStatus("Edit-2511 创建任务中... / Creating task...");
+  const res = await apiFetch("async/images/edits", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: fd,
+  });
+
+  const j = await readJsonSafely(res);
+  if (!res.ok || !j.task_id) {
+    setStatus("Edit-2511 创建失败 / Create failed", "err");
+    addOutputItem({
+      title: "Edit-2511 创建任务失败 / Create failed",
+      meta: `HTTP ${res.status}`,
+      rawJson: j,
+    });
+    throw new Error("创建任务失败 / Create failed");
+  }
+
+  const taskId = j.task_id;
+  setStatus(`Edit-2511 任务已创建，开始轮询... (${taskId.slice(0,8)})`);
+
+  const result = await pollTask(taskId, apiKey, {
+    intervalMs: 6000,
+    onTick: (info) => {
+      setStatus(
+        waitingStatusText(
+          "Edit-2511",
+          info.tick,
+          info.elapsedMs,
+          `task=${taskId.slice(0,8)}`
+        )
+      );
+    },
+  });
+
+  addOutputItem({ title: `Edit-2511 任务结果 task=${taskId.slice(0,8)}`, rawJson: result.raw });
+
+  if (result.status !== "success") {
+    setStatus("Edit-2511 失败 / Failed", "err");
+    throw new Error(`任务失败 / Task failed: ${result.status}`);
+  }
+
+  const fileUrl = result.raw?.output?.file_url;
+  if (!fileUrl) throw new Error("success 但没有 file_url / no file_url");
+
+  setStatus("Edit-2511 下载中... / Downloading...");
+  const { objUrl } = await fetchAsBlob(fileUrl, "image");
+
+  const img = document.createElement("img");
+  img.src = objUrl;
+
+  addOutputItem({
+    title: "Edit-2511 输出图片",
+    meta: `task_id=${taskId}`,
+    element: img,
+    download: { href: objUrl, filename: `edit-2511-${nowTs()}.png` },
+    openUrl: $("editOpenUrl").checked ? fileUrl : null,
+  });
+
+  setStatus("Edit-2511 成功 / Success", "ok");
+}
+
+// -------- Wan2.2 I2V --------
+function applyWanResolution() {
+  const key = $("wanResPreset").value;
+  const [w, h] = WAN_RES_PRESETS[key];
+  $("wanW").value = String(w);
+  $("wanH").value = String(h);
+}
+
+function applyWanPreset() {
+  const p = $("wanPreset").value;
+  let steps = 30;
+  let guidance = 5.0;
+  let fps = 24;
+
+  if (p.includes("更清晰")) { steps = 60; guidance = 6.0; }
+  else if (p.includes("更动感")) { steps = 40; guidance = 5.0; fps = 30; }
+  else if (p.includes("更快")) { steps = 20; guidance = 4.0; }
+
+  $("wanSteps").value = String(steps);
+  $("wanGuidance").value = String(guidance);
+  $("wanFps").value = String(fps);
+
+  if ($("wanAutoFrames").checked) {
+    $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
+  }
+}
+
+function buildWanFormData({
+  imageFile, prompt, model, numInferenceSteps, numFrames, guidanceScale,
+  width, height, negativePrompt, seed, watermark, promptExtend, useTypoField=false
+}) {
+  const fd = new FormData();
+  fd.append("prompt", prompt);
+  fd.append("model", model);
+  fd.append("num_frames", String(numFrames));
+  fd.append("guidance_scale", String(guidanceScale));
+  fd.append("height", String(height));
+  fd.append("width", String(width));
+  if (negativePrompt?.trim()) fd.append("negative_prompt", negativePrompt.trim());
+  if (seed !== null && seed !== undefined) fd.append("seed", String(seed));
+  if (watermark !== null && watermark !== undefined) fd.append("watermark", watermark ? "true" : "false");
+  if (promptExtend !== null && promptExtend !== undefined) fd.append("prompt_extend", promptExtend ? "true" : "false");
+  fd.append(useTypoField ? "num_inferenece_steps" : "num_inference_steps", String(numInferenceSteps));
+  fd.append("image", imageFile, imageFile.name);
+  return fd;
+}
+
+async function createWanTask(apiKey, params) {
+  // Try correct field name first
+  let fd = buildWanFormData({ ...params, useTypoField:false });
+  let res = await apiFetch("async/videos/image-to-video", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: fd,
+  });
+  let j = await readJsonSafely(res);
+  if (res.ok && j.task_id) return { ok:true, res, json:j, tried:"num_inference_steps" };
+
+  // Fallback to typo
+  fd = buildWanFormData({ ...params, useTypoField:true });
+  res = await apiFetch("async/videos/image-to-video", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}` },
+    body: fd,
+  });
+  const j2 = await readJsonSafely(res);
+  if (res.ok && j2.task_id) return { ok:true, res, json:j2, tried:"num_inferenece_steps" };
+
+  return { ok:false, res, json:{ _try1: j, _try2: j2 }, tried:"both" };
+}
+
+// Optional: zip segments via JSZip loaded dynamically when needed
+async function ensureJsZip() {
+  if (window.JSZip) return window.JSZip;
+  const script = document.createElement("script");
+  script.src = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+  script.crossOrigin = "anonymous";
+  document.head.appendChild(script);
+  await new Promise((resolve, reject) => {
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("加载 JSZip 失败 / Failed to load JSZip"));
+  });
+  return window.JSZip;
+}
+
+async function zipAndDownloadMp4s(files, zipName) {
+  const JSZip = await ensureJsZip();
+  const zip = new JSZip();
+  for (const f of files) {
+    zip.file(f.name, f.blob);
+  }
+  const blob = await zip.generateAsync({ type: "blob" });
+  downloadBlob(blob, zipName);
+}
+
+async function runWan() {
+  const apiKey = getApiKey();
+  rememberKeyMaybe();
+
+  const img = $("wanImg").files?.[0];
+  if (!img) throw new Error("请选择有效图片 / Please select a valid image");
+
+  const prompt = $("wanPrompt").value.trim();
+  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+
+  const neg = $("wanNeg").value.trim();
+
+  const width = clampInt($("wanW").value, 64, 2048, 832);
+  const height = clampInt($("wanH").value, 64, 2048, 480);
+  const steps = clampInt($("wanSteps").value, 1, 100, 30);
+  const guidance = clampFloat($("wanGuidance").value, 0, 20, 5.0);
+
+  const fps = clampInt($("wanFps").value, 1, 60, 24);
+  const duration = clampFloat($("wanDuration").value, 0.5, 60, 5.0);
+
+  let numFrames;
+  if ($("wanAutoFrames").checked) {
+    numFrames = Math.max(1, Math.min(300, fps * 5));
+    $("wanFrames").value = String(numFrames);
+  } else {
+    numFrames = clampInt($("wanFrames").value, 1, 300, 30);
+  }
+
+  const seedVal = clampInt($("wanSeed").value, -1, 2147483647, -1);
+  const seed = seedVal < 0 ? null : seedVal;
+
+  const watermark = $("wanWatermark").checked;
+  const promptExtend = $("wanPromptExtend").checked;
+
+  // segment logic (same spirit as desktop): assume backend returns 5s per segment
+  const segmentLen = 5.0;
+  const segCount = Math.max(1, Math.ceil(duration / segmentLen));
+
+  const segments = []; // {name, blob, objUrl, fileUrl, taskId}
+
+  for (let i = 0; i < segCount; i++) {
+    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 创建中... / Segment ${i+1}/${segCount} creating...`);
+
+    const create = await createWanTask(apiKey, {
+      imageFile: img,
+      prompt,
+      model: "Wan2_2-I2V-A14B",
+      numInferenceSteps: steps,
+      numFrames,
+      guidanceScale: guidance,
+      width,
+      height,
+      negativePrompt: neg,
+      seed,
+      watermark,
+      promptExtend,
+    });
+
+    if (!create.ok) {
+      setStatus("Wan2.2 创建失败 / Create failed", "err");
+      addOutputItem({
+        title: `Wan2.2 创建任务失败（分段 ${i+1}）`,
+        meta: `tried=${create.tried}, HTTP ${create.res.status}`,
+        rawJson: create.json,
+      });
+      throw new Error("创建任务失败 / Create failed");
+    }
+
+    const taskId = create.json.task_id;
+    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 任务已创建，开始轮询... (${taskId.slice(0,8)})`);
+
+    const result = await pollTask(taskId, apiKey, {
+      timeoutMs: 60*60*1000,
+      intervalMs: 8000,
+      onTick: (info) => {
+        setStatus(
+          waitingStatusText(
+            `Wan2.2 分段 ${i+1}/${segCount}`,
+            info.tick,
+            info.elapsedMs,
+            `task=${taskId.slice(0,8)}`
+          )
+        );
+      },
+    });
+
+    addOutputItem({ title: `Wan2.2 分段 ${i+1} 任务结果`, rawJson: result.raw, meta: `task_id=${taskId}` });
+
+    if (result.status !== "success") {
+      setStatus("Wan2.2 失败 / Failed", "err");
+      throw new Error(`任务失败 / Task failed: ${result.status}`);
+    }
+
+    const fileUrl = result.raw?.output?.file_url;
+    if (!fileUrl) throw new Error("success 但没有 file_url / no file_url");
+
+    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 下载中... / Downloading...`);
+    const dl = await fetchAsBlob(fileUrl, "video");
+    const name = `wan_seg${i+1}_${nowTs()}.mp4`;
+
+    segments.push({ name, blob: dl.blob, objUrl: dl.objUrl, fileUrl, taskId });
+
+    // Show each segment playable + download
+    const video = document.createElement("video");
+    video.controls = true;
+    video.src = dl.objUrl;
+
+    addOutputItem({
+      title: `Wan2.2 输出视频（分段 ${i+1}/${segCount}）`,
+      meta: `width=${width}, height=${height}, frames=${numFrames}, steps=${steps}, guidance=${guidance}`,
+      element: video,
+      download: { href: dl.objUrl, filename: name },
+      openUrl: $("wanOpenUrl").checked ? fileUrl : null,
+    });
+  }
+
+  // Optional zip download
+  if (segCount > 1 && $("wanZipSegments").checked) {
+    try {
+      setStatus("Wan2.2 打包 zip 中... / Zipping...");
+      await zipAndDownloadMp4s(segments, `wan_segments_${nowTs()}.zip`);
+      setStatus("Wan2.2 成功 / Success", "ok");
+    } catch (e) {
+      addOutputItem({ title: "Wan2.2 zip 打包失败 / Zip failed", meta: String(e) });
+      setStatus("Wan2.2 成功（但 zip 失败）/ Success (zip failed)", "ok");
+    }
+  } else {
+    setStatus("Wan2.2 成功 / Success", "ok");
+  }
+}
+
+// ---- init UI ----
+function initUi() {
+  // fill selects
+  const zRes = $("zRes");
+  for (const k of Object.keys(Z_RESOLUTIONS)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    zRes.appendChild(o);
+  }
+  zRes.value = Object.keys(Z_RESOLUTIONS)[0];
+
+  const qwenRes = $("qwenRes");
+  for (const k of Object.keys(QWEN_RESOLUTIONS)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    qwenRes.appendChild(o);
+  }
+  qwenRes.value = Object.keys(QWEN_RESOLUTIONS)[0];
+
+  const wanRes = $("wanResPreset");
+  for (const k of Object.keys(WAN_RES_PRESETS)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    wanRes.appendChild(o);
+  }
+  wanRes.value = Object.keys(WAN_RES_PRESETS)[0];
+  applyWanResolution();
+
+  // task type checkboxes
+  const box = $("editTaskTypes");
+  for (const t of EDIT_TASK_TYPES) {
+    const label = document.createElement("label");
+    label.className = "chk";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "editTaskType";
+    input.value = t;
+    input.checked = (t === "id" || t === "style");
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(" " + t));
+    box.appendChild(label);
+  }
+
+  // model selection
+  $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
+  showPanel($("modelSel").value);
+
+  // buttons
+  $("btnZRun").onclick = async () => {
+    try { await runZImage(); }
+    catch (e) { addOutputItem({ title:"z-image 错误 / Error", meta:String(e) }); }
+  };
+  $("btnQwenRun").onclick = async () => {
+    try { await runQwenImage2512(); }
+    catch (e) { addOutputItem({ title:"Qwen-Image-2512 错误 / Error", meta:String(e) }); }
+  };
+  $("btnEditRun").onclick = async () => {
+    try { await runEdit(); }
+    catch (e) { addOutputItem({ title:"Edit-2511 错误 / Error", meta:String(e) }); }
+  };
+  $("btnWanRun").onclick = async () => {
+    try { await runWan(); }
+    catch (e) { addOutputItem({ title:"Wan2.2 错误 / Error", meta:String(e) }); }
+  };
+
+  $("btnHyRun").onclick = async () => {
+    try { await runHunyuanVideo(); }
+    catch (e) { addOutputItem({ title:"HunyuanVideo 错误 / Error", meta:String(e) }); }
+  };
+
+  $("btnClearOutput").onclick = clearOutput;
+
+  $("btnWanApplyPreset").onclick = applyWanPreset;
+  $("wanResPreset").addEventListener("change", applyWanResolution);
+  $("wanAutoFrames").addEventListener("change", () => {
+    if ($("wanAutoFrames").checked) {
+      const fps = clampInt($("wanFps").value, 1, 60, 24);
+      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
+    }
+  });
+  $("wanFps").addEventListener("change", () => {
+    if ($("wanAutoFrames").checked) {
+      const fps = clampInt($("wanFps").value, 1, 60, 24);
+      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
+    }
+  });
+
+  $("btnClearKey").onclick = clearRememberedKey;
+
+  loadRememberedKey();
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  initUi();
+  setStatus("准备就绪 / Ready");
+});
