@@ -9,8 +9,13 @@ const Z_RESOLUTIONS = {
   "16:9 (2048*1152)": [2048, 1152],
   "9:16 (1152*2048)": [1152, 2048],
   "1:1 (1024*1024)": [1024, 1024],
+  "4:3 (1024*768)": [1024, 768],
+  "3:4 (768*1024)": [768, 1024],
   "16:9 (1024*576)": [1024, 576],
   "9:16 (576*1024)": [576, 1024],
+  "3:2 (1024*640)": [1024, 640],
+  "1:1 (512*512)": [512, 512],
+  "1:1 (256*256)": [256, 256],
 };
 
 const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
@@ -183,8 +188,8 @@ async function runTextToImage() {
   rememberKeyMaybe();
 
   const model = $("modelSel").value;
-  const prompt = $("zPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词");
+  const basePrompt = $("zPrompt").value.trim();
+  if (!basePrompt) throw new Error("请输入提示词");
 
   const negPrompt = $("zNegPrompt").value.trim();
   const n = clampInt($("zN").value, 1, 4, 1);
@@ -193,7 +198,16 @@ async function runTextToImage() {
 
   const steps = clampInt($("zSteps").value, 1, 50, 4);
   const cfg = clampFloat($("zCfg").value, 0, 20, 1);
-  const seed = clampInt($("zSeed").value, -1, 2147483647, -1);
+  
+  // 随机种子处理：如果是 -1，生成随机整数并回写到输入框
+  let seed = clampInt($("zSeed").value, -1, 2147483647, -1);
+  if (seed === -1) {
+    seed = Math.floor(Math.random() * 2147483647);
+    $("zSeed").value = seed;
+  }
+
+  // 防缓存策略：在实际发送的提示词后附加微小的随机不可见空格，强行绕过服务器端的完全相同文本缓存
+  const prompt = basePrompt + " ".repeat(Math.floor(Math.random() * 4) + 1);
 
   setStatus(`${model} 生成中...`);
 
@@ -256,7 +270,7 @@ async function runTextToImage() {
     const img = document.createElement("img");
     img.src = blobInfo.objUrl;
     addOutputItem({
-      title: `${model} 输出 #${i+1}`,
+      title: `${model} 输出 (Seed: ${seed})`,
       element: img,
       download: { href: blobInfo.objUrl, filename: `${model}-${nowTs()}-${i+1}.png` },
     });
@@ -346,7 +360,6 @@ function initUi() {
     box.appendChild(label);
   }
 
-  // 绑定随机种子骰子按钮事件
   if ($("btnRandSeed")) {
     $("btnRandSeed").onclick = () => {
       $("zSeed").value = Math.floor(Math.random() * 2147483647);
