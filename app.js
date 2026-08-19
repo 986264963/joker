@@ -1,12 +1,16 @@
 const $ = (id) => document.getElementById(id);
 
 const Z_RESOLUTIONS = {
-  "1:1 (2048x2048)": [2048, 2048],
-  "1:1 (1024x1024)": [1024, 1024],
-  "3:4 (768x1024)": [768, 1024],
-  "4:3 (1024x768)": [1024, 768],
-  "16:9 (1024x576)": [1024, 576],
-  "9:16 (576x1024)": [576, 1024],
+  "1:1 (2048*2048) [Pro推荐]": [2048, 2048],
+  "1:1 (1024*1024) [标准推荐]": [1024, 1024],
+  "16:9 (2688*1536) [Pro横屏]": [2688, 1536],
+  "9:16 (1536*2688) [Pro竖屏]": [1536, 2688],
+  "4:3 (2368*1728) [Pro大图]": [2368, 1728],
+  "3:4 (1728*2368) [Pro大图]": [1728, 2368],
+  "16:9 (1344*768) [标准横屏]": [1344, 768],
+  "9:16 (768*1344) [标准竖屏]": [768, 1344],
+  "3:2 (1248*832)": [1248, 832],
+  "2:3 (832*1248)": [832, 1248]
 };
 
 const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
@@ -243,7 +247,9 @@ async function runTextToImage() {
   const negPrompt = $("zNegPrompt").value.trim();
   const n = clampInt($("zN").value, 1, 4, 1);
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
-  const size = `${w}x${h}`;
+  
+  // 核心修复：将尺寸分隔符从 'x' 改为 '*'
+  const size = `${w}*${h}`;
 
   setStatus(`${model} 生成中...`);
   const payload = { prompt, model, n, size };
