@@ -1,8 +1,6 @@
 const $ = (id) => document.getElementById(id);
 
-// 严格对应你截图中给出的全部分辨率选项（包含 2K 高清档与 1K 标准档）
 const Z_RESOLUTIONS = {
-  // 2K / 2048 系列
   "1:1 (2048*2048)": [2048, 2048],
   "4:3 (2048*1536)": [2048, 1536],
   "3:4 (1536*2048)": [1536, 2048],
@@ -10,8 +8,6 @@ const Z_RESOLUTIONS = {
   "2:3 (1360*2048)": [1360, 2048],
   "16:9 (2048*1152)": [2048, 1152],
   "9:16 (1152*2048)": [1152, 2048],
-
-  // 1K / 标准系列
   "1:1 (1024*1024)": [1024, 1024],
   "4:3 (1024*768)": [1024, 768],
   "3:4 (768*1024)": [768, 1024],
@@ -33,74 +29,51 @@ function nowTs() {
 function setStatus(text, kind="info") {
   const badge = $("statusBadge");
   if (!badge) return;
-
   badge.textContent = text;
-  badge.style.borderColor =
-    kind === "ok" ? "rgba(37,194,160,.7)" :
-    kind === "err" ? "rgba(255,84,112,.75)" :
-    "rgba(255,255,255,.10)";
-
-  badge.style.background =
-    kind === "ok" ? "rgba(37,194,160,.10)" :
-    kind === "err" ? "rgba(255,84,112,.10)" :
-    "rgba(255,255,255,.06)";
+  badge.style.borderColor = kind === "ok" ? "rgba(37,194,160,.7)" : kind === "err" ? "rgba(255,84,112,.75)" : "rgba(255,255,255,.10)";
+  badge.style.background = kind === "ok" ? "rgba(37,194,160,.10)" : kind === "err" ? "rgba(255,84,112,.10)" : "rgba(255,255,255,.06)";
 }
 
-function waitingStatusText(label, tick, elapsedMs, extra="") {
+function waitingStatusText(label, tick, elapsedMs) {
   const sec = Math.floor(elapsedMs / 1000);
-  const extraText = extra ? ` • ${extra}` : "";
-  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查${extraText}`;
+  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查`;
 }
 
 function getApiKey() {
   const key = $("apiKey").value.trim();
-  if (!key) throw new Error("请输入 API Key / Please enter API Key");
+  if (!key) throw new Error("请输入 API Key");
   return key;
 }
 
 function rememberKeyMaybe() {
   const key = $("apiKey").value.trim();
-  if ($("rememberKey").checked && key) {
-    localStorage.setItem("moark_api_key", key);
-  }
+  if ($("rememberKey")?.checked && key) localStorage.setItem("moark_api_key", key);
 }
 
 function loadRememberedKey() {
   const key = localStorage.getItem("moark_api_key") || "";
   if (key) {
     $("apiKey").value = key;
-    $("rememberKey").checked = true;
+    if ($("rememberKey")) $("rememberKey").checked = true;
   }
 }
 
-function clearRememberedKey() {
-  localStorage.removeItem("moark_api_key");
-  $("apiKey").value = "";
-  $("rememberKey").checked = false;
-}
-
-// 仅保留要求的两个文生图模型
-const T2I_MODELS = [
-  "Qwen-Image-2512",
-  "Z-Image-Turbo"
-];
-const EDIT_MODELS = [
-  "Qwen-Image-Edit-2511",
-  "Qwen-Image-Edit"
-];
+const T2I_MODELS = ["Qwen-Image-2512", "Z-Image-Turbo"];
+const EDIT_MODELS = ["Qwen-Image-Edit-2511", "Qwen-Image-Edit"];
 
 function showPanel(model) {
   const isT2I = T2I_MODELS.includes(model);
   const isEdit = EDIT_MODELS.includes(model);
-
   $("panelZ").style.display = isT2I ? "block" : "none";
   $("panelEdit").style.display = isEdit ? "block" : "none";
+  if (isT2I) $("t2iTitle").textContent = `${model}（文生图）`;
+  if (isEdit) $("editTitle").textContent = `${model}（图生图）`;
 
-  if (isT2I) {
-    $("t2iTitle").textContent = `${model}（文生图 / Text-to-Image）`;
-  }
-  if (isEdit) {
-    $("editTitle").textContent = `${model}（图生图 / Image-to-Image）`;
+  // 针对 Z-Image-Turbo 默认推荐 9 步，Qwen 推荐 4 步
+  if (model === "Z-Image-Turbo") {
+    $("zSteps").value = 9;
+  } else if (model === "Qwen-Image-2512") {
+    $("zSteps").value = 4;
   }
 }
 
@@ -126,15 +99,6 @@ function addOutputItem({title, meta="", element=null, rawJson=null, download=nul
     const pre = document.createElement("pre");
     pre.textContent = JSON.stringify(rawJson, null, 2);
     box.appendChild(pre);
-
-    const btns = document.createElement("div");
-    btns.className = "row";
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = "下载 JSON / Download JSON";
-    b.onclick = () => downloadBlob(new Blob([pre.textContent], {type:"application/json"}), `${title}_${nowTs()}.json`);
-    btns.appendChild(b);
-    box.appendChild(btns);
   }
 
   if (download || openUrl) {
@@ -143,11 +107,10 @@ function addOutputItem({title, meta="", element=null, rawJson=null, download=nul
     if (download) {
       const btn = document.createElement("a");
       btn.className = "btn";
-      btn.textContent = "下载 / Download";
+      btn.textContent = "下载图片";
       btn.href = download.href;
       btn.download = download.filename || "";
       btn.target = "_blank";
-      btn.rel = "noopener";
       row.appendChild(btn);
     }
     if (openUrl) {
@@ -156,7 +119,6 @@ function addOutputItem({title, meta="", element=null, rawJson=null, download=nul
       b2.textContent = "打开 file_url";
       b2.href = openUrl;
       b2.target = "_blank";
-      b2.rel = "noopener";
       row.appendChild(b2);
     }
     box.appendChild(row);
@@ -166,19 +128,14 @@ function addOutputItem({title, meta="", element=null, rawJson=null, download=nul
   return box;
 }
 
-function clearOutput() {
-  $("output").innerHTML = "";
-}
+function clearOutput() { $("output").innerHTML = ""; }
 
 async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
-  const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, { method, headers, body, signal });
-  return res;
+  return await fetch(`/api/${path.replace(/^\/+/, "")}`, { method, headers, body, signal });
 }
 
 async function dlFetch(url) {
-  const u = `/dl?url=${encodeURIComponent(url)}`;
-  const res = await fetch(u, { method: "GET" });
-  return res;
+  return await fetch(`/dl?url=${encodeURIComponent(url)}`, { method: "GET" });
 }
 
 async function readJsonSafely(res) {
@@ -196,17 +153,6 @@ function clampFloat(v, lo, hi, defv) {
   return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : defv;
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
-
 async function fetchAsBlob(url) {
   const r = await dlFetch(url);
   if (!r.ok) {
@@ -214,19 +160,15 @@ async function fetchAsBlob(url) {
     throw new Error(`下载失败 (${r.status}): ${JSON.stringify(j).slice(0, 240)}`);
   }
   const blob = await r.blob();
-  const objUrl = URL.createObjectURL(blob);
-  return { blob, objUrl };
+  return { blob, objUrl: URL.createObjectURL(blob) };
 }
 
 async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, onTick=null}={}) {
   const start = Date.now();
   let tick = 0;
-
   while (Date.now() - start < timeoutMs) {
     tick++;
-    const elapsedMs = Date.now() - start;
-    if (onTick) onTick({ tick, elapsedMs });
-
+    if (onTick) onTick({ tick, elapsedMs: Date.now() - start });
     const res = await apiFetch(`task/${encodeURIComponent(taskId)}`, {
       method: "GET",
       headers: { "Authorization": `Bearer ${apiKey}` },
@@ -238,10 +180,10 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
     }
     await new Promise(r => setTimeout(r, intervalMs));
   }
-  return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
+  return { status: "timeout", raw: { status:"timeout" } };
 }
 
-// -------- 文生图 --------
+// -------- 文生图（核心修复：参数放入 extra_body） --------
 async function runTextToImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -253,19 +195,46 @@ async function runTextToImage() {
   const negPrompt = $("zNegPrompt").value.trim();
   const n = clampInt($("zN").value, 1, 4, 1);
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
-  
-  // 使用标准的 * 符号拼接尺寸，避免报错
   const size = `${w}*${h}`;
 
+  // 获取高级参数
+  const steps = clampInt($("zSteps").value, 1, 50, 4);
+  const cfg = clampFloat($("zCfg").value, 0, 20, 1);
+  const seed = clampInt($("zSeed").value, -1, 2147483647, 0);
+
   setStatus(`${model} 生成中...`);
-  const payload = { prompt, model, n, size };
-  if (negPrompt) {
-    payload.negative_prompt = negPrompt;
+
+  // 严格按照官方 API 要求，将参数封装在 extra_body 中
+  const payload = {
+    prompt,
+    model,
+    n,
+    size,
+    extra_body: {
+      width: 0,
+      height: 0,
+      num_inference_steps: steps,
+      cfg_scale: cfg,
+      seed: seed,
+      negative_prompt: negPrompt,
+      lora_weights: [],
+      lora_scale: 0
+    }
+  };
+
+  const headers = {
+    "Authorization": `Bearer ${apiKey}`,
+    "Content-Type": "application/json"
+  };
+
+  // 如果是 Z-Image-Turbo，带上官方截图中的 failover 请求头
+  if (model === "Z-Image-Turbo") {
+    headers["X-Failover-Enabled"] = "true";
   }
 
   const res = await apiFetch("images/generations", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: headers,
     body: JSON.stringify(payload),
   });
 
@@ -304,7 +273,7 @@ async function runTextToImage() {
   setStatus(`${model} 成功`, "ok");
 }
 
-// -------- 图生图 / 图像编辑 --------
+// -------- 图生图 --------
 async function runEdit() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -363,7 +332,6 @@ async function runEdit() {
   setStatus(`${model} 成功`, "ok");
 }
 
-// 初始化 UI
 function initUi() {
   const zRes = $("zRes");
   for (const k of Object.keys(Z_RESOLUTIONS)) {
@@ -393,8 +361,8 @@ function initUi() {
   $("btnZRun").onclick = async () => { try { await runTextToImage(); } catch (e) { addOutputItem({ title:"错误", meta:String(e) }); } };
   $("btnEditRun").onclick = async () => { try { await runEdit(); } catch (e) { addOutputItem({ title:"错误", meta:String(e) }); } };
 
-  $("btnClearOutput").onclick = clearOutput;
-  $("btnClearKey").onclick = clearRememberedKey;
+  if ($("btnClearOutput")) $("btnClearOutput").onclick = clearOutput;
+  if ($("btnClearKey")) $("btnClearKey").onclick = () => { localStorage.removeItem("moark_api_key"); $("apiKey").value = ""; };
 
   loadRememberedKey();
 }
