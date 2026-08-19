@@ -1,9 +1,15 @@
 // Moark Web (Cloudflare Pages/Workers)
-const BASE_V1 = "https://ai.gitee.com/v1"; 
+// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
+// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
+
+const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
 const $ = (id) => document.getElementById(id);
 
+// 包含 2048 高清分辨率映射表
 const Z_RESOLUTIONS = {
-  "1:1 (2048x2048)": [2048, 2048],
+  "2K 方图 (2048x2048)": [2048, 2048],
+  "2K 竖屏 (1152x2048)": [1152, 2048],
+  "2K 横屏 (2048x1152)": [2048, 1152],
   "1:1 (1024x1024)": [1024, 1024],
   "3:4 (768x1024)": [768, 1024],
   "4:3 (1024x768)": [1024, 768],
@@ -78,10 +84,10 @@ function clearRememberedKey() {
 }
 
 function showPanel(model) {
-  if ($("panelZ")) $("panelZ").style.display = model === "z-image" ? "block" : "none";
-  if ($("panelEdit")) $("panelEdit").style.display = model === "Edit-2511" ? "block" : "none";
-  if ($("panelWan")) $("panelWan").style.display = model === "Wan2.2-I2V-A14B" ? "block" : "none";
-  if ($("panelHunyuan")) $("panelHunyuan").style.display = model === "HunyuanVideo-1.5" ? "block" : "none";
+  $("panelZ").style.display = model === "Qwen-Image-2512" ? "block" : "none";
+  $("panelEdit").style.display = model === "Edit-2511" ? "block" : "none";
+  $("panelWan").style.display = model === "Wan2.2-I2V-A14B" ? "block" : "none";
+  $("panelHunyuan").style.display = model === "HunyuanVideo-1.5" ? "block" : "none";
 }
 
 function addOutputItem({title, kind="info", meta="", element=null, rawJson=null, download=null, openUrl=null}) {
@@ -160,6 +166,7 @@ function clearOutput() {
   $("output").innerHTML = "";
 }
 
+// Same-origin proxy to ai.gitee.com/v1
 async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
   const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
     method,
@@ -170,6 +177,7 @@ async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}
   return res;
 }
 
+// Download proxy for arbitrary file_url/image urls to avoid CORS
 async function dlFetch(url, {signal=null}={}) {
   const u = `/dl?url=${encodeURIComponent(url)}`;
   const res = await fetch(u, {method:"GET", signal});
@@ -219,6 +227,7 @@ async function fetchAsBlob(url, kindHint="file") {
   return { blob, objUrl };
 }
 
+// Poll task status
 async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, onTick=null}={}) {
   const start = Date.now();
   let tick = 0;
@@ -228,7 +237,10 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
     const elapsedMs = Date.now() - start;
 
     if (onTick) {
-      onTick({ tick, elapsedMs });
+      onTick({
+        tick,
+        elapsedMs,
+      });
     }
 
     const res = await apiFetch(`task/${encodeURIComponent(taskId)}`, {
@@ -246,7 +258,8 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
   return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
 }
 
-// -------- HunyuanVideo-1.5 --------
+
+// -------- HunyuanVideo-1.5 (Text-to-Video) --------
 async function runHunyuanVideo() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -255,6 +268,7 @@ async function runHunyuanVideo() {
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
   const negative_prompt = $("hyNeg").value.trim();
+
   const aspect_ratio = $("hyAspect").value;
   const num_inferenece_steps = clampInt($("hySteps").value, 1, 10, 10);
   const num_frames = clampInt($("hyFrames").value, 81, 241, 241);
@@ -303,7 +317,10 @@ async function runHunyuanVideo() {
   const taskId = j.task_id;
   if (!taskId) {
     setStatus("HunyuanVideo 失败 / Failed", "err");
-    addOutputItem({ title: "HunyuanVideo 未返回 task_id / Missing task_id", rawJson: j });
+    addOutputItem({
+      title: "HunyuanVideo 未返回 task_id / Missing task_id",
+      rawJson: j,
+    });
     throw new Error("Task ID not found in response");
   }
 
@@ -354,17 +371,26 @@ async function runHunyuanVideo() {
       download: { href: blobInfo.objUrl, filename: `hunyuan-video-${nowTs()}.mp4` },
       openUrl: openAfter ? fileUrl : null,
     });
+
     setStatus("HunyuanVideo 成功 / Success", "ok");
   } else if (textRes) {
-    addOutputItem({ title: "HunyuanVideo 文本输出 / Text output", meta: `task_id=${taskId}`, rawJson: raw });
+    addOutputItem({
+      title: "HunyuanVideo 文本输出 / Text output",
+      meta: `task_id=${taskId}`,
+      rawJson: raw,
+    });
     setStatus("HunyuanVideo 成功 / Success", "ok");
   } else {
-    addOutputItem({ title: "HunyuanVideo 成功但无输出 / Success but no output", meta: `task_id=${taskId}`, rawJson: raw });
+    addOutputItem({
+      title: "HunyuanVideo 成功但无输出 / Success but no output",
+      meta: `task_id=${taskId}`,
+      rawJson: raw,
+    });
     setStatus("HunyuanVideo 成功 / Success", "ok");
   }
 }
 
-// -------- z-image (兼容 2048 高清报错) --------
+// -------- Qwen-Image-2512 (文生图) --------
 async function runZImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -375,24 +401,33 @@ async function runZImage() {
   const n = clampInt($("zN").value, 1, 4, 1);
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}x${h}`;
-  const seed = Math.floor(Math.random() * 2147483647);
 
-  setStatus("z-image 生成中... / Generating...");
+  // 随机种子：若输入 -1 或无效则自动随机生成
+  const seedInput = Number.parseInt($("zSeed").value, 10);
+  const seed = (Number.isFinite(seedInput) && seedInput >= 0) 
+    ? seedInput 
+    : Math.floor(Math.random() * 2147483647);
+
+  const steps = clampInt($("zSteps").value, 1, 50, 4);
+  const cfg = clampFloat($("zCfg").value, 0, 20, 1.0);
+  const negativePrompt = $("zNeg").value.trim();
+
+  setStatus("Qwen-Image-2512 生成中... / Generating...");
   
-  // 兼容 2048 分辨率及高分辨率报错的 extra_body 参数
+  // 严格对齐官方要求的 Payload 结构（关键：extra_body 内传递 width: 0, height: 0 解决 2048 报错）
   const payload = { 
     prompt, 
-    model: "z-image", 
+    model: "Qwen-Image-2512", 
     n, 
     size,
     seed,
     extra_body: {
       width: 0,
       height: 0,
-      num_inference_steps: 4,
-      cfg_scale: 1,
-      seed,
-      negative_prompt: "",
+      num_inference_steps: steps,
+      cfg_scale: cfg,
+      seed: seed,
+      negative_prompt: negativePrompt,
       lora_weights: [],
       lora_scale: 0
     }
@@ -409,15 +444,15 @@ async function runZImage() {
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("z-image 失败 / Failed", "err");
-    addOutputItem({ title: "z-image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    setStatus("Qwen-Image-2512 失败 / Failed", "err");
+    addOutputItem({ title: "Qwen-Image-2512 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
     throw new Error(`API 错误 / API Error (${res.status})`);
   }
 
   const data = Array.isArray(j.data) ? j.data : [];
   if (!data.length) {
-    addOutputItem({ title: "z-image 返回无数据 / Empty response", rawJson: j });
-    setStatus("z-image 失败 / Failed", "err");
+    addOutputItem({ title: "Qwen-Image-2512 返回无数据 / Empty response", rawJson: j });
+    setStatus("Qwen-Image-2512 失败 / Failed", "err");
     return;
   }
 
@@ -434,23 +469,23 @@ async function runZImage() {
       const blob = new Blob([bytes], { type: "image/png" });
       blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
     } else {
-      addOutputItem({ title: `z-image 第${i+1}张无数据 / No image data`, rawJson: item });
+      addOutputItem({ title: `Qwen-Image-2512 第${i+1}张无数据 / No image data`, rawJson: item });
       continue;
     }
 
     const img = document.createElement("img");
     img.src = blobInfo.objUrl;
 
-    const filename = `z-image-${nowTs()}-${i+1}.png`;
+    const filename = `Qwen-Image-2512-${nowTs()}-${i+1}.png`;
     addOutputItem({
-      title: `z-image 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
+      title: `Qwen-Image-2512 输出 #${i+1} (Seed: ${seed})`,
+      meta: `size=${size} • n=${n} • seed=${seed} • steps=${steps}`,
       element: img,
       download: { href: blobInfo.objUrl, filename },
     });
   }
 
-  setStatus("z-image 成功 / Success", "ok");
+  setStatus("Qwen-Image-2512 成功 / Success", "ok");
 }
 
 // -------- Edit-2511 --------
@@ -488,7 +523,11 @@ async function runEdit() {
   const j = await readJsonSafely(res);
   if (!res.ok || !j.task_id) {
     setStatus("Edit-2511 创建失败 / Create failed", "err");
-    addOutputItem({ title: "Edit-2511 创建任务失败 / Create failed", meta: `HTTP ${res.status}`, rawJson: j });
+    addOutputItem({
+      title: "Edit-2511 创建任务失败 / Create failed",
+      meta: `HTTP ${res.status}`,
+      rawJson: j,
+    });
     throw new Error("创建任务失败 / Create failed");
   }
 
@@ -498,7 +537,14 @@ async function runEdit() {
   const result = await pollTask(taskId, apiKey, {
     intervalMs: 6000,
     onTick: (info) => {
-      setStatus(waitingStatusText("Edit-2511", info.tick, info.elapsedMs, `task=${taskId.slice(0,8)}`));
+      setStatus(
+        waitingStatusText(
+          "Edit-2511",
+          info.tick,
+          info.elapsedMs,
+          `task=${taskId.slice(0,8)}`
+        )
+      );
     },
   });
 
@@ -657,6 +703,7 @@ async function runWan() {
 
   const segmentLen = 5.0;
   const segCount = Math.max(1, Math.ceil(duration / segmentLen));
+
   const segments = [];
 
   for (let i = 0; i < segCount; i++) {
@@ -694,7 +741,14 @@ async function runWan() {
       timeoutMs: 60*60*1000,
       intervalMs: 8000,
       onTick: (info) => {
-        setStatus(waitingStatusText(`Wan2.2 分段 ${i+1}/${segCount}`, info.tick, info.elapsedMs, `task=${taskId.slice(0,8)}`));
+        setStatus(
+          waitingStatusText(
+            `Wan2.2 分段 ${i+1}/${segCount}`,
+            info.tick,
+            info.elapsedMs,
+            `task=${taskId.slice(0,8)}`
+          )
+        );
       },
     });
 
@@ -741,7 +795,7 @@ async function runWan() {
   }
 }
 
-// ---- 初始化 UI ----
+// ---- init UI ----
 function initUi() {
   const zRes = $("zRes");
   for (const k of Object.keys(Z_RESOLUTIONS)) {
@@ -752,66 +806,67 @@ function initUi() {
   zRes.value = Object.keys(Z_RESOLUTIONS)[0];
 
   const wanRes = $("wanResPreset");
-  if (wanRes) {
-    for (const k of Object.keys(WAN_RES_PRESETS)) {
-      const o = document.createElement("option");
-      o.value = k; o.textContent = k;
-      wanRes.appendChild(o);
-    }
-    wanRes.value = Object.keys(WAN_RES_PRESETS)[0];
-    applyWanResolution();
+  for (const k of Object.keys(WAN_RES_PRESETS)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    wanRes.appendChild(o);
   }
+  wanRes.value = Object.keys(WAN_RES_PRESETS)[0];
+  applyWanResolution();
 
   const box = $("editTaskTypes");
-  if (box) {
-    for (const t of EDIT_TASK_TYPES) {
-      const label = document.createElement("label");
-      label.className = "chk";
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.name = "editTaskType";
-      input.value = t;
-      input.checked = (t === "id" || t === "style");
-      label.appendChild(input);
-      label.appendChild(document.createTextNode(" " + t));
-      box.appendChild(label);
+  for (const t of EDIT_TASK_TYPES) {
+    const label = document.createElement("label");
+    label.className = "chk";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "editTaskType";
+    input.value = t;
+    input.checked = (t === "id" || t === "style");
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(" " + t));
+    box.appendChild(label);
+  }
+
+  $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
+  showPanel($("modelSel").value);
+
+  $("btnZRun").onclick = async () => {
+    try { await runZImage(); }
+    catch (e) { addOutputItem({ title:"Qwen-Image-2512 错误 / Error", meta:String(e) }); }
+  };
+  $("btnEditRun").onclick = async () => {
+    try { await runEdit(); }
+    catch (e) { addOutputItem({ title:"Edit-2511 错误 / Error", meta:String(e) }); }
+  };
+  $("btnWanRun").onclick = async () => {
+    try { await runWan(); }
+    catch (e) { addOutputItem({ title:"Wan2.2 错误 / Error", meta:String(e) }); }
+  };
+
+  $("btnHyRun").onclick = async () => {
+    try { await runHunyuanVideo(); }
+    catch (e) { addOutputItem({ title:"HunyuanVideo 错误 / Error", meta:String(e) }); }
+  };
+
+  $("btnClearOutput").onclick = clearOutput;
+
+  $("btnWanApplyPreset").onclick = applyWanPreset;
+  $("wanResPreset").addEventListener("change", applyWanResolution);
+  $("wanAutoFrames").addEventListener("change", () => {
+    if ($("wanAutoFrames").checked) {
+      const fps = clampInt($("wanFps").value, 1, 60, 24);
+      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
     }
-  }
+  });
+  $("wanFps").addEventListener("change", () => {
+    if ($("wanAutoFrames").checked) {
+      const fps = clampInt($("wanFps").value, 1, 60, 24);
+      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
+    }
+  });
 
-  // 绑定下拉框切换面板事件
-  if ($("modelSel")) {
-    $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
-    showPanel($("modelSel").value);
-  }
-
-  // 按钮事件绑定
-  if ($("btnZRun")) $("btnZRun").onclick = async () => { try { await runZImage(); } catch (e) { addOutputItem({ title:"z-image 错误 / Error", meta:String(e) }); } };
-  if ($("btnEditRun")) $("btnEditRun").onclick = async () => { try { await runEdit(); } catch (e) { addOutputItem({ title:"Edit-2511 错误 / Error", meta:String(e) }); } };
-  if ($("btnWanRun")) $("btnWanRun").onclick = async () => { try { await runWan(); } catch (e) { addOutputItem({ title:"Wan2.2 错误 / Error", meta:String(e) }); } };
-  if ($("btnHyRun")) $("btnHyRun").onclick = async () => { try { await runHunyuanVideo(); } catch (e) { addOutputItem({ title:"HunyuanVideo 错误 / Error", meta:String(e) }); } };
-
-  if ($("btnClearOutput")) $("btnClearOutput").onclick = clearOutput;
-  if ($("btnWanApplyPreset")) $("btnWanApplyPreset").onclick = applyWanPreset;
-  if ($("wanResPreset")) $("wanResPreset").addEventListener("change", applyWanResolution);
-  
-  if ($("wanAutoFrames")) {
-    $("wanAutoFrames").addEventListener("change", () => {
-      if ($("wanAutoFrames").checked) {
-        const fps = clampInt($("wanFps").value, 1, 60, 24);
-        $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
-      }
-    });
-  }
-  if ($("wanFps")) {
-    $("wanFps").addEventListener("change", () => {
-      if ($("wanAutoFrames").checked && $("wanAutoFrames").checked) {
-        const fps = clampInt($("wanFps").value, 1, 60, 24);
-        $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
-      }
-    });
-  }
-
-  if ($("btnClearKey")) $("btnClearKey").onclick = clearRememberedKey;
+  $("btnClearKey").onclick = clearRememberedKey;
 
   loadRememberedKey();
 }
