@@ -90,11 +90,8 @@
       <div class="row">
         <select id="modelSel" class="input">
           <optgroup label="🖼️ 文生图 (Text-to-Image)">
-            <option value="Z-Image">Z-Image</option>
-            <option value="Z-Image-Turbo">Z-Image-Turbo</option>
             <option value="Qwen-Image-2512">Qwen-Image-2512（支持反向提示词）</option>
-            <option value="Qwen-Image-2.0-Pro">Qwen-Image-2.0-Pro</option>
-            <option value="Qwen-Image-2.0">Qwen-Image-2.0</option>
+            <option value="Z-Image-Turbo">Z-Image-Turbo</option>
           </optgroup>
           <optgroup label="🎨 图生图 (Image-to-Image / Edit)">
             <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
@@ -108,10 +105,10 @@
       <h2 id="t2iTitle">文生图 / Text-to-Image</h2>
 
       <label class="lab">提示词 Prompt（中/英均可）</label>
-      <textarea id="zPrompt" class="textarea" rows="5" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
+      <textarea id="zPrompt" class="textarea" rows="5" placeholder="例如：一张虚构的英语电影海报..."></textarea>
 
       <label class="lab">反向提示词 Negative Prompt（部分模型适用）</label>
-      <textarea id="zNegPrompt" class="textarea" rows="3" placeholder="例如：lowres, blurry, bad anatomy, deformed"></textarea>
+      <textarea id="zNegPrompt" class="textarea" rows="3" placeholder="例如：lowres, blurry, bad anatomy"></textarea>
 
       <div class="grid2">
         <div>
