@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Image View - Qwen & Z-Image Studio</title>
+  <title>Image View - 多模型 AI 工具箱</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
     <div class="topbar-main">
       <div class="topbar-left">
         <div class="brand-mark">M</div>
-        <div class="h1">Image View</div>
+        <div class="h1">Image View & Studio</div>
       </div>
       <div class="topbar-right">
         <div class="status">
@@ -26,6 +26,7 @@
   </header>
 
   <main class="container">
+    <!-- API Key 配置卡片 -->
     <section class="card">
       <h2>1. 输入 API Key / Enter API Key</h2>
       <div class="row">
@@ -37,30 +38,29 @@
         <button class="btn" id="btnClearKey">清除</button>
       </div>
       <div class="hint">
-        提示：本工具通过同站点的 <span class="mono">/api/*</span> 代理转发到 <span class="mono">https://ai.gitee.com/v1</span>[span_168](start_span)[span_168](end_span)。
+        提示：通过同站点 <span class="mono">/api/*</span> 代理转发到 <span class="mono">https://ai.gitee.com/v1</span>[span_1](start_span)[span_1](end_span)。
       </div>
     </section>
 
-    <!-- 文生图专属面板：只包含 Qwen-Image-2512 和 z-image-turbo -->
+    <!-- 模块 1：文生图（含 2048 高清选项） -->
     <section class="card model-panel" id="panelZ">
-      <h2>文生图模型 / Text-to-Image</h2>
-
+      <h2>2. 文生图模型 (Text-to-Image)</h2>
       <label class="lab">选择模型 / Select Model</label>
       <select id="zModelSel" class="input">
         <option value="Qwen-Image-2512">Qwen-Image-2512（支持安全高清输出）</option>
         <option value="z-image-turbo">z-image-turbo（极速生成）</option>
       </select>
 
-      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
-      <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
+      <label class="lab">提示词 Prompt</label>
+      <textarea id="zPrompt" class="textarea" rows="4" placeholder="例如：一只赛博朋克风的猫咪，超清，细节拉满"></textarea>
 
       <div class="grid3">
         <div>
-          <label class="lab">分辨率 Resolution</label>
+          <label class="lab">分辨率 / Resolution</label>
           <select id="zRes" class="input"></select>
         </div>
         <div>
-          <label class="lab">张数 n（1-4）</label>
+          <label class="lab">张数 n (1-4)</label>
           <input id="zN" class="input" type="number" min="1" max="4" value="1" />
         </div>
         <div>
@@ -68,20 +68,47 @@
           <input id="zSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
         </div>
       </div>
-
-      <div class="hint">
-        提示：Seed 设为 -1 或留空时，每次点击执行都会自动使用新的随机种子，解决重复出图问题。<br/>
-      </div>
-
-      <div class="row">
-        <button class="btn primary" id="btnZRun">执行 / Generate</button>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnZRun">生成图片 / Generate Image</button>
       </div>
     </section>
 
-    <!-- 输出面板 -->
+    <!-- 模块 2：图像编辑 (Edit-2511) -->
+    <section class="card model-panel" id="panelEdit">
+      <h2>3. 图像编辑 (Edit-2511)</h2>
+      <div class="grid2">
+        <div>
+          <label class="lab">原图 URL 1 / Image URL 1</label>
+          <input id="editImg1" class="input" placeholder="https://..." />
+        </div>
+        <div>
+          <label class="lab">原图 URL 2 (可选) / Image URL 2</label>
+          <input id="editImg2" class="input" placeholder="https://..." />
+        </div>
+      </div>
+      <label class="lab">编辑提示词 / Edit Prompt</label>
+      <textarea id="editPrompt" class="textarea" rows="3" placeholder="例如：将背景替换为星空"></textarea>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnEditRun">执行图像编辑 / Edit Image</button>
+      </div>
+    </section>
+
+    <!-- 模块 3：图生视频 (Wan2.2) -->
+    <section class="card model-panel" id="panelWan">
+      <h2>4. 图生视频 (Wan2.2 Video)</h2>
+      <label class="lab">输入图片 URL / Source Image URL</label>
+      <input id="wanImgUrl" class="input" placeholder="https://..." />
+      <label class="lab">视频描述提示词 / Motion Prompt</label>
+      <textarea id="wanPrompt" class="textarea" rows="3" placeholder="例如：镜头缓慢推近，微风吹拂头发"></textarea>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnWanRun">生成视频 / Generate Video</button>
+      </div>
+    </section>
+
+    <!-- 输出结果面板 -->
     <section class="card">
       <div class="row row-between">
-        <h2>输出 / Output</h2>
+        <h2>输出结果 / Output</h2>
         <div class="row-inline">
           <button class="btn" id="btnClearOutput">清空输出</button>
         </div>
@@ -91,7 +118,7 @@
   </main>
 
   <footer class="footer">
-    <div class="mono">Powered by Cloudflare Pages Functions proxy</div>
+    <div class="mono">Powered by Cloudflare Pages Functions proxy[span_2](start_span)[span_2](end_span)</div>
   </footer>
 
   <script src="./app.js"></script>
