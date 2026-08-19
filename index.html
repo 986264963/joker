@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Image View - AI Multi-Model Studio</title>
+  <title>Image View</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -55,6 +55,20 @@
     </div>
   </header>
 
+  <div class="donate-modal" id="donateModal" aria-hidden="true">
+    <div class="donate-mask" id="donateMask"></div>
+    <div class="donate-panel" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
+      <button class="donate-close" id="donateClose" type="button" aria-label="关闭">×</button>
+      <div class="donate-eyebrow">Support this project</div>
+      <h3 id="donateTitle">Buy me a coffee</h3>
+      <p class="donate-text">
+        如果真的帮助到了你，请为我打赏一杯咖啡吧，有了你的赞助，我会将服务一直运行下去的。 我的联系方式：admin@airymoon.com。 项目开源地址：https://github.com/MallocPointer/gitee/
+      </p>
+      <img class="donate-image" src="./image.png" alt="项目赞助收款码" />
+      <a class="btn primary donate-download" href="./image.png" target="_blank" rel="noopener">打开收款码</a>
+    </div>
+  </div>
+
   <main class="container">
     <section class="card">
       <h2>1. 输入 API Key / Enter API Key</h2>
@@ -66,32 +80,28 @@
         </label>
         <button class="btn" id="btnClearKey">清除</button>
       </div>
+      <div class="hint">
+        提示：本工具默认通过同站点的 <span class="mono">/api/*</span> 代理转发到 <span class="mono">https://ai.gitee.com/v1</span>，避免浏览器 CORS 限制。
+      </div>
     </section>
 
     <section class="card">
       <h2>2. 选择模型 / Select Model</h2>
       <div class="row">
         <select id="modelSel" class="input">
-          <optgroup label="🖼️ 文生图 (Text-to-Image)">
-            <option value="Qwen-Image-2512">Qwen-Image-2512</option>
-            <option value="Z-Image-Turbo">Z-Image-Turbo</option>
-          </optgroup>
-          <optgroup label="🎨 图生图 (Image-to-Image / Edit)">
-            <option value="Qwen-Image-Edit-2511">Qwen-Image-Edit-2511</option>
-            <option value="Qwen-Image-Edit">Qwen-Image-Edit</option>
-          </optgroup>
+          <option value="z-image">z-image（文生图 / Text-to-Image）</option>
+          <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
+          <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
+          <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
         </select>
       </div>
     </section>
 
+    <!-- 面板 1：文生图 (z-image) -->
     <section class="card model-panel" id="panelZ">
-      <h2 id="t2iTitle">文生图 / Text-to-Image</h2>
-
-      <label class="lab">提示词 Prompt（中/英均可）</label>
-      <textarea id="zPrompt" class="textarea" rows="5" placeholder="例如：一张虚构的英语电影海报..."></textarea>
-
-      <label class="lab">反向提示词 Negative Prompt</label>
-      <textarea id="zNegPrompt" class="textarea" rows="2" placeholder="指导模型避免所描述的内容"></textarea>
+      <h2>z-image（文生图 / Text-to-Image）</h2>
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="zPrompt" class="textarea" rows="4" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
 
       <div class="grid2">
         <div>
@@ -99,78 +109,54 @@
           <select id="zRes" class="input"></select>
         </div>
         <div>
-          <label class="lab">张数 n（接口通常限制为1）</label>
+          <label class="lab">张数 n（1-4）</label>
           <input id="zN" class="input" type="number" min="1" max="4" value="1" />
         </div>
       </div>
 
-      <div class="grid3" style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;">
-        <div>
-          <label class="lab">推理步数 Steps</label>
-          <input id="zSteps" class="input" type="number" min="1" max="50" value="4" />
-        </div>
-        <div>
-          <label class="lab">CFG Scale</label>
-          <input id="zCfg" class="input" type="number" min="0" max="20" step="0.5" value="1" />
-        </div>
-        <div>
-          <label class="lab">随机种子 Seed (-1随机)</label>
-          <div style="display: flex; gap: 6px;">
-            <input id="zSeed" class="input" type="number" value="-1" style="flex: 1;" />
-            <button class="btn" id="btnRandSeed" type="button" title="随机生成一个新种子" style="padding: 0 10px;">🎲</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top: 15px;">
-        <button class="btn primary" id="btnZRun">执行 / Generate</button>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnZRun">生成图片 / Generate</button>
       </div>
     </section>
 
+    <!-- 面板 2：图像编辑 (Edit-2511) -->
     <section class="card model-panel" id="panelEdit">
-      <h2 id="editTitle">图生图 / Image-to-Image</h2>
-
-      <div class="grid2">
-        <div>
-          <label class="lab">图1 Image 1</label>
-          <input id="editImg1" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
-        </div>
-        <div>
-          <label class="lab">图2 Image 2（可选）</label>
-          <input id="editImg2" class="input" type="file" accept="image/png,image/jpeg,image/webp" />
-        </div>
-      </div>
-
-      <label class="lab">提示词 Prompt / 操作说明</label>
-      <textarea id="editPrompt" class="textarea" rows="4" placeholder="描述你要的编辑效果"></textarea>
-
-      <label class="lab">任务类型 Task Types</label>
-      <div class="checks" id="editTaskTypes"></div>
-
-      <div class="grid2">
-        <div>
-          <label class="lab">num_inference_steps</label>
-          <input id="editSteps" class="input" type="number" min="1" max="50" value="4" />
-        </div>
-        <div>
-          <label class="lab">guidance_scale</label>
-          <input id="editGuidance" class="input" type="number" min="0" max="10" step="0.5" value="1" />
-        </div>
-      </div>
-
-      <label class="chk">
-        <input type="checkbox" id="editOpenUrl" />
-        完成后浏览器打开 file_url
-      </label>
-
-      <div class="row">
-        <button class="btn primary" id="btnEditRun">执行 / Run</button>
+      <h2>Edit-2511（图像编辑 / Image Edit）</h2>
+      <label class="lab">原图 URL / Image URL</label>
+      <input id="editImg" class="input" placeholder="https://..." />
+      <label class="lab">编辑指令 Prompt</label>
+      <textarea id="editPrompt" class="textarea" rows="3" placeholder="例如：将背景换成星空"></textarea>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnEditRun">执行编辑 / Edit</button>
       </div>
     </section>
 
+    <!-- 面板 3：图生视频 (Wan2.2-I2V-A14B) -->
+    <section class="card model-panel" id="panelWan">
+      <h2>Wan2.2-I2V-A14B（图生视频）</h2>
+      <label class="lab">起始图片 URL / Image URL</label>
+      <input id="wanImg" class="input" placeholder="https://..." />
+      <label class="lab">运动提示词 Prompt</label>
+      <textarea id="wanPrompt" class="textarea" rows="3" placeholder="例如：镜头拉近，微风吹拂"></textarea>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnWanRun">生成视频 / Generate Video</button>
+      </div>
+    </section>
+
+    <!-- 面板 4：文生视频 (HunyuanVideo-1.5) -->
+    <section class="card model-panel" id="panelHunyuan">
+      <h2>HunyuanVideo-1.5（文生视频）</h2>
+      <label class="lab">视频提示词 Prompt</label>
+      <textarea id="hunyuanPrompt" class="textarea" rows="3" placeholder="例如：海浪拍打沙滩，4K"></textarea>
+      <div class="row" style="margin-top: 12px;">
+        <button class="btn primary" id="btnHunyuanRun">生成视频 / Generate Video</button>
+      </div>
+    </section>
+
+    <!-- 输出结果 -->
     <section class="card">
       <div class="row row-between">
-        <h2>输出 / Output</h2>
+        <h2>输出结果 / Output</h2>
         <div class="row-inline">
           <button class="btn" id="btnClearOutput">清空输出</button>
         </div>
