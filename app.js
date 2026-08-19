@@ -252,12 +252,14 @@ async function runTextToImage() {
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}x${h}`;
 
-  setStatus(`${model} 生成中...`);
-  const payload = { prompt, model, n, size };
-  if (negPrompt) {
-    payload.negative_prompt = negPrompt;
-  }
+  
+setStatus(`${model} 生成中...`);
+const payload = { prompt, model, n, size, seed: -1 };
+if (negPrompt) {
+  payload.negative_prompt = negPrompt;
+}
 
+  
   const res = await apiFetch("images/generations", {
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
