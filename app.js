@@ -1,916 +1,281 @@
 // Moark Web (Cloudflare Pages/Workers)
-// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
-// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
+// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.[span_0](start_span)[span_0](end_span)
+// - Downloads images via /dl?url=... (Pages Function) to avoid cross-origin blocks.[span_1](start_span)[span_1](end_span)
 
-const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
-const $ = (id) => document.getElementById(id);
+const BASE_V1 = "https://ai.gitee.com/v1";[span_2](start_span)[span_2](end_span)
+const $ = (id) => document.getElementById(id);[span_3](start_span)[span_3](end_span)
 
-// 已同步补充高清分辨率（支持小写 x 格式）
+// 已加回 2048x2048 高清分辨率选项
 const Z_RESOLUTIONS = {
-  "9:16 (1152x2048)": [1152, 2048],
-  "16:9 (2048x1152)": [2048, 1152],
-  "1:1 (2048x2048)": [2048, 2048],
   "1:1 (1024x1024)": [1024, 1024],
+  "1:1 (2048x2048) [高清]": [2048, 2048],
   "3:4 (768x1024)": [768, 1024],
-  "4:3 (1024x768)": [1024, 768],
+  "3:4 (1536x2048) [高清]": [1536, 2048],
   "16:9 (1024x576)": [1024, 576],
-  "9:16 (576x1024)": [576, 1024],
+  "16:9 (2048x1152) [高清]": [2048, 1152],
 };
 
-const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
-
-const WAN_RES_PRESETS = {
-  "480p 横屏 / 832x480 (推荐 / Recommended)": [832, 480],
-  "480p 竖屏 / 480x832": [480, 832],
-  "720p 横屏 / 1280x720": [1280, 720],
-  "720p 竖屏 / 720x1280": [720, 1280],
-  "1024 方图 / 1024x1024": [1024, 1024],
-  "2048 方图 / 2048x2048 (高成本 / Expensive)": [2048, 2048],
-};
-
-function nowTs() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+function nowTs() {[span_4](start_span)[span_4](end_span)
+  const d = new Date();[span_5](start_span)[span_5](end_span)
+  const pad = (n) => String(n).padStart(2, "0");[span_6](start_span)[span_6](end_span)
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;[span_7](start_span)[span_7](end_span)
 }
 
-function setStatus(text, kind="info") {
-  const badge = $("statusBadge");
-  if (!badge) return;
+function setStatus(text, kind="info") {[span_8](start_span)[span_8](end_span)
+  const badge = $("statusBadge");[span_9](start_span)[span_9](end_span)
+  if (!badge) return;[span_10](start_span)[span_10](end_span)
 
-  badge.textContent = text;
-  badge.style.borderColor =
-    kind === "ok" ? "rgba(37,194,160,.7)" :
-    kind === "err" ? "rgba(255,84,112,.75)" :
-    "rgba(255,255,255,.10)";
+  badge.textContent = text;[span_11](start_span)[span_11](end_span)
+  badge.style.borderColor =[span_12](start_span)[span_12](end_span)
+    kind === "ok" ? "rgba(37,194,160,.7)" :[span_13](start_span)[span_13](end_span)
+    kind === "err" ? "rgba(255,84,112,.75)" :[span_14](start_span)[span_14](end_span)
+    "rgba(255,255,255,.10)";[span_15](start_span)[span_15](end_span)
 
-  badge.style.background =
-    kind === "ok" ? "rgba(37,194,160,.10)" :
-    kind === "err" ? "rgba(255,84,112,.10)" :
-    "rgba(255,255,255,.06)";
+  badge.style.background =[span_16](start_span)[span_16](end_span)
+    kind === "ok" ? "rgba(37,194,160,.10)" :[span_17](start_span)[span_17](end_span)
+    kind === "err" ? "rgba(255,84,112,.10)" :[span_18](start_span)[span_18](end_span)
+    "rgba(255,255,255,.06)";[span_19](start_span)[span_19](end_span)
 }
 
-function waitingStatusText(label, tick, elapsedMs, extra="") {
-  const sec = Math.floor(elapsedMs / 1000);
-  const extraText = extra ? ` • ${extra}` : "";
-  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查${extraText} • 正常等待，并非卡死`;
+function getApiKey() {[span_20](start_span)[span_20](end_span)
+  const key = $("apiKey").value.trim();[span_21](start_span)[span_21](end_span)
+  if (!key) throw new Error("请输入 API Key / Please enter API Key");[span_22](start_span)[span_22](end_span)
+  return key;[span_23](start_span)[span_23](end_span)
 }
 
-function getApiKey() {
-  const key = $("apiKey").value.trim();
-  if (!key) throw new Error("请输入 API Key / Please enter API Key");
-  return key;
-}
-
-function rememberKeyMaybe() {
-  const key = $("apiKey").value.trim();
-  if ($("rememberKey").checked && key) {
-    localStorage.setItem("moark_api_key", key);
+function rememberKeyMaybe() {[span_24](start_span)[span_24](end_span)
+  const key = $("apiKey").value.trim();[span_25](start_span)[span_25](end_span)
+  if ($("rememberKey").checked && key) {[span_26](start_span)[span_26](end_span)
+    localStorage.setItem("moark_api_key", key);[span_27](start_span)[span_27](end_span)
   }
 }
 
-function loadRememberedKey() {
-  const key = localStorage.getItem("moark_api_key") || "";
-  if (key) {
-    $("apiKey").value = key;
-    $("rememberKey").checked = true;
+function loadRememberedKey() {[span_28](start_span)[span_28](end_span)
+  const key = localStorage.getItem("moark_api_key") || "";[span_29](start_span)[span_29](end_span)
+  if (key) {[span_30](start_span)[span_30](end_span)
+    $("apiKey").value = key;[span_31](start_span)[span_31](end_span)
+    $("rememberKey").checked = true;[span_32](start_span)[span_32](end_span)
   }
 }
 
-function clearRememberedKey() {
-  localStorage.removeItem("moark_api_key");
-  $("apiKey").value = "";
-  $("rememberKey").checked = false;
+function clearRememberedKey() {[span_33](start_span)[span_33](end_span)
+  localStorage.removeItem("moark_api_key");[span_34](start_span)[span_34](end_span)
+  $("apiKey").value = "";[span_35](start_span)[span_35](end_span)
+  $("rememberKey").checked = false;[span_36](start_span)[span_36](end_span)
 }
 
-const T2I_MODELS = [
-  "z-image-turbo", "Qwen-Image-2.0-Pro", "Qwen-Image-2.0", "Qwen-Image-2512",
-  "FLUX.2-dev", "FLUX.1-dev", "FLUX.1-schnell", "FLUX.1-Krea-dev", 
-  "Kolors", "stable-diffusion-3.5-large-turbo", "GLM-Image", "CogView4-6B",
-  "HiDream-I1-Full", "Wan2.7-Image"
-];
+function addOutputItem({title, kind="info", meta="", element=null, rawJson=null, download=null}) {[span_37](start_span)[span_37](end_span)
+  const out = $("output");[span_38](start_span)[span_38](end_span)
+  const box = document.createElement("div");[span_39](start_span)[span_39](end_span)
+  box.className = "item";[span_40](start_span)[span_40](end_span)
 
-const EDIT_MODELS = [
-  "Qwen-Image-Edit-2511", "Qwen-Image-Edit", "LongCat-Image-Edit", "RMBG-2.0", "Real-ESRGAN"
-];
+  const h = document.createElement("h3");[span_41](start_span)[span_41](end_span)
+  h.textContent = title;[span_42](start_span)[span_42](end_span)
+  box.appendChild(h);[span_43](start_span)[span_43](end_span)
 
-const VIDEO_MODELS = [
-  "Wan 2.7-万相视频生成模型", "Wan2.2-I2V-A14B", "Wan2.1-T2V-14B", 
-  "HunyuanVideo-1.5", "ViduQ3-Pro", "LTX-2"
-];
-
-function showPanel(model) {
-  const isT2I = T2I_MODELS.includes(model);
-  const isEdit = EDIT_MODELS.includes(model);
-  const isVideo = VIDEO_MODELS.includes(model) || model === "Wan2.2-I2V-A14B" || model === "HunyuanVideo-1.5";
-
-  $("panelZ").style.display = isT2I ? "block" : "none";
-  $("panelEdit").style.display = isEdit ? "block" : "none";
-  $("panelWan").style.display = (isVideo && model !== "HunyuanVideo-1.5") ? "block" : "none";
-  $("panelHunyuan").style.display = (model === "HunyuanVideo-1.5" || isVideo) ? "block" : "none";
-
-  if (isT2I) {
-    $("t2iTitle").textContent = `${model}（文生图 / Text-to-Image）`;
-  }
-  if (isEdit) {
-    $("editTitle").textContent = `${model}（图像编辑处理 / Image Process）`;
-  }
-}
-
-function addOutputItem({title, kind="info", meta="", element=null, rawJson=null, download=null, openUrl=null}) {
-  const out = $("output");
-  const box = document.createElement("div");
-  box.className = "item";
-
-  const h = document.createElement("h3");
-  h.textContent = title;
-  box.appendChild(h);
-
-  if (meta) {
-    const m = document.createElement("div");
-    m.className = "meta";
-    m.textContent = meta;
-    box.appendChild(m);
+  if (meta) {[span_44](start_span)[span_44](end_span)
+    const m = document.createElement("div");[span_45](start_span)[span_45](end_span)
+    m.className = "meta";[span_46](start_span)[span_46](end_span)
+    m.textContent = meta;[span_47](start_span)[span_47](end_span)
+    box.appendChild(m);[span_48](start_span)[span_48](end_span)
   }
 
-  if (element) box.appendChild(element);
+  if (element) box.appendChild(element);[span_49](start_span)[span_49](end_span)
 
-  if (rawJson) {
-    const pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(rawJson, null, 2);
-    box.appendChild(pre);
-
-    const btns = document.createElement("div");
-    btns.className = "row";
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = "下载 JSON / Download JSON";
-    b.onclick = () => downloadBlob(new Blob([pre.textContent], {type:"application/json"}), `${title}_${nowTs()}.json`);
-    btns.appendChild(b);
-    box.appendChild(btns);
+  if (rawJson) {[span_50](start_span)[span_50](end_span)
+    const pre = document.createElement("pre");[span_51](start_span)[span_51](end_span)
+    pre.textContent = JSON.stringify(rawJson, null, 2);[span_52](start_span)[span_52](end_span)
+    box.appendChild(pre);[span_53](start_span)[span_53](end_span)
   }
 
-  if (download) {
-    const btn = document.createElement("a");
-    btn.className = "btn";
-    btn.textContent = "下载 / Download";
-    btn.href = download.href;
-    btn.download = download.filename || "";
-    btn.target = "_blank";
-    btn.rel = "noopener";
-    const row = document.createElement("div");
-    row.className = "row";
-    row.appendChild(btn);
-
-    if (openUrl) {
-      const b2 = document.createElement("a");
-      b2.className = "btn";
-      b2.textContent = "打开 file_url";
-      b2.href = openUrl;
-      b2.target = "_blank";
-      b2.rel = "noopener";
-      row.appendChild(b2);
-    }
-    box.appendChild(row);
-  } else if (openUrl) {
-    const row = document.createElement("div");
-    row.className = "row";
-    const b2 = document.createElement("a");
-    b2.className = "btn";
-    b2.textContent = "打开 file_url";
-    b2.href = openUrl;
-    b2.target = "_blank";
-    b2.rel = "noopener";
-    row.appendChild(b2);
-    box.appendChild(row);
+  if (download) {[span_54](start_span)[span_54](end_span)
+    const btn = document.createElement("a");[span_55](start_span)[span_55](end_span)
+    btn.className = "btn";[span_56](start_span)[span_56](end_span)
+    btn.textContent = "下载 / Download";[span_57](start_span)[span_57](end_span)
+    btn.href = download.href;[span_58](start_span)[span_58](end_span)
+    btn.download = download.filename || "";[span_59](start_span)[span_59](end_span)
+    btn.target = "_blank";[span_60](start_span)[span_60](end_span)
+    btn.rel = "noopener";[span_61](start_span)[span_61](end_span)
+    const row = document.createElement("div");[span_62](start_span)[span_62](end_span)
+    row.className = "row";[span_63](start_span)[span_63](end_span)
+    row.appendChild(btn);[span_64](start_span)[span_64](end_span)
+    box.appendChild(row);[span_65](start_span)[span_65](end_span)
   }
 
-  out.prepend(box);
+  out.prepend(box);[span_66](start_span)[span_66](end_span)
   return box;
 }
 
-function clearOutput() {
-  $("output").innerHTML = "";
+function clearOutput() {[span_67](start_span)[span_67](end_span)
+  $("output").innerHTML = "";[span_68](start_span)[span_68](end_span)
 }
 
-async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
-  const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
-    method,
-    headers,
-    body,
-    signal,
+async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {[span_69](start_span)[span_69](end_span)
+  const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {[span_70](start_span)[span_70](end_span)
+    method,[span_71](start_span)[span_71](end_span)
+    headers,[span_72](start_span)[span_72](end_span)
+    body,[span_73](start_span)[span_73](end_span)
+    signal,[span_74](start_span)[span_74](end_span)
   });
-  return res;
+  return res;[span_75](start_span)[span_75](end_span)
 }
 
-async function dlFetch(url, {signal=null}={}) {
-  const u = `/dl?url=${encodeURIComponent(url)}`;
-  const res = await fetch(u, {method:"GET", signal});
-  return res;
+async function dlFetch(url, {signal=null}={}) {[span_76](start_span)[span_76](end_span)
+  const u = `/dl?url=${encodeURIComponent(url)}`;[span_77](start_span)[span_77](end_span)
+  const res = await fetch(u, {method:"GET", signal});[span_78](start_span)[span_78](end_span)
+  return res;[span_79](start_span)[span_79](end_span)
 }
 
-async function readJsonSafely(res) {
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { _text: text };
+async function readJsonSafely(res) {[span_80](start_span)[span_80](end_span)
+  const text = await res.text();[span_81](start_span)[span_81](end_span)
+  try {[span_82](start_span)[span_82](end_span)
+    return JSON.parse(text);[span_83](start_span)[span_83](end_span)
+  } catch {[span_84](start_span)[span_84](end_span)
+    return { _text: text };[span_85](start_span)[span_85](end_span)
   }
 }
 
-function clampInt(v, lo, hi, defv) {
-  const n = Number.parseInt(String(v), 10);
-  if (Number.isFinite(n)) return Math.max(lo, Math.min(hi, n));
-  return defv;
+function clampInt(v, lo, hi, defv) {[span_86](start_span)[span_86](end_span)
+  const n = Number.parseInt(String(v), 10);[span_87](start_span)[span_87](end_span)
+  if (Number.isFinite(n)) return Math.max(lo, Math.min(hi, n));[span_88](start_span)[span_88](end_span)
+  return defv;[span_89](start_span)[span_89](end_span)
 }
 
-function clampFloat(v, lo, hi, defv) {
-  const n = Number.parseFloat(String(v));
-  if (Number.isFinite(n)) return Math.max(lo, Math.min(hi, n));
-  return defv;
+async function fetchAsBlob(url) {[span_90](start_span)[span_90](end_span)
+  const r = await dlFetch(url);[span_91](start_span)[span_91](end_span)
+  if (!r.ok) {[span_92](start_span)[span_92](end_span)
+    const j = await readJsonSafely(r);[span_93](start_span)[span_93](end_span)
+    throw new Error(`下载失败 / Download failed (${r.status}): ${JSON.stringify(j).slice(0, 240)}`);[span_94](start_span)[span_94](end_span)
+  }
+  const blob = await r.blob();[span_95](start_span)[span_95](end_span)
+  const objUrl = URL.createObjectURL(blob);[span_96](start_span)[span_96](end_span)
+  return { blob, objUrl };[span_97](start_span)[span_97](end_span)
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
+// -------- 文生图统一调用（已对齐官方 API，支持高分辨率及 extra_body）--------
+async function runZImage() {
+  const apiKey = getApiKey();[span_98](start_span)[span_98](end_span)
+  rememberKeyMaybe();[span_99](start_span)[span_99](end_span)
 
-async function fetchAsBlob(url, kindHint="file") {
-  const r = await dlFetch(url);
-  if (!r.ok) {
-    const j = await readJsonSafely(r);
-    throw new Error(`下载失败 / Download failed (${r.status}): ${JSON.stringify(j).slice(0, 240)}`);
-  }
-  const blob = await r.blob();
-  const objUrl = URL.createObjectURL(blob);
-  return { blob, objUrl };
-}
+  const prompt = $("zPrompt").value.trim();[span_100](start_span)[span_100](end_span)
+  if (!prompt) throw new Error("请输入提示词 / Please input prompt");[span_101](start_span)[span_101](end_span)
 
-async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, onTick=null}={}) {
-  const start = Date.now();
-  let tick = 0;
+  const model = $("zModelSel").value; 
+  const n = clampInt($("zN").value, 1, 4, 1);[span_102](start_span)[span_102](end_span)
+  const [w, h] = Z_RESOLUTIONS[$("zRes").value];[span_103](start_span)[span_103](end_span)
+  const size = `${w}x${h}`;[span_104](start_span)[span_104](end_span)
 
-  while (Date.now() - start < timeoutMs) {
-    tick++;
-    const elapsedMs = Date.now() - start;
+  const seedInput = $("zSeed").value.trim();
+  const seed = (seedInput === "" || Number(seedInput) < 0) 
+    ? Math.floor(Math.random() * 2147483647) 
+    : Number.parseInt(seedInput, 10);
 
-    if (onTick) {
-      onTick({
-        tick,
-        elapsedMs,
-      });
-    }
-
-    const res = await apiFetch(`task/${encodeURIComponent(taskId)}`, {
-      method: "GET",
-      headers: { "Authorization": `Bearer ${apiKey}` },
-    });
-    const j = await readJsonSafely(res);
-    const st = j.status || "unknown";
-    if (st === "success" || st === "failed" || st === "cancelled") {
-      return { status: st, raw: j };
-    }
-    await new Promise(r => setTimeout(r, intervalMs));
-  }
-
-  return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
-}
-
-// -------- Async Video Task Handler --------
-async function runHunyuanVideo() {
-  const apiKey = getApiKey();
-  rememberKeyMaybe();
-
-  const model = $("modelSel").value;
-  const prompt = $("hyPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
-
-  const negative_prompt = $("hyNeg").value.trim();
-  const aspect_ratio = $("hyAspect").value;
-  const num_inferenece_steps = clampInt($("hySteps").value, 1, 10, 10);
-  const num_frames = clampInt($("hyFrames").value, 81, 241, 241);
-
-  const seedRaw = $("hySeed").value;
-  const seed = Number.parseInt(String(seedRaw), 10);
-  if (!Number.isFinite(seed) || seed <= 0) {
-    throw new Error("seed 必须是正整数 / seed must be a positive integer");
-  }
-
-  const fps = clampInt($("hyFps").value, 1, 24, 24);
-  const openAfter = $("hyOpenUrl").checked;
-
-  const payload = {
-    prompt,
-    model: VIDEO_MODELS.includes(model) ? model : "HunyuanVideo-1.5",
-    aspect_ratio,
-    negative_prompt,
-    num_inferenece_steps,
-    num_frames,
-    seed,
-    fps,
-  };
-
-  setStatus(`${model} 创建任务... / Creating task...`);
-  const res = await apiFetch("async/videos/generations", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const j = await readJsonSafely(res);
-  if (!res.ok) {
-    setStatus(`${model} 失败 / Failed`, "err");
-    addOutputItem({
-      title: `${model} 创建任务失败 / Create task failed`,
-      meta: `HTTP ${res.status}`,
-      rawJson: j,
-    });
-    throw new Error(`API 错误 / API Error (${res.status})`);
-  }
-
-  const taskId = j.task_id;
-  if (!taskId) {
-    setStatus(`${model} 失败 / Failed`, "err");
-    addOutputItem({
-      title: `${model} 未返回 task_id / Missing task_id`,
-      rawJson: j,
-    });
-    throw new Error("Task ID not found in response");
-  }
-
-  addOutputItem({
-    title: `${model} 任务已创建 / Task created`,
-    meta: `task_id=${taskId} • aspect_ratio=${aspect_ratio} • frames=${num_frames} • fps=${fps}`,
-    rawJson: j,
-    openUrl: openAfter ? `https://ai.gitee.com/v1/task/${encodeURIComponent(taskId)}` : null,
-  });
-
-  setStatus(`${model} 任务已创建，开始轮询...`);
-  const result = await pollTask(taskId, apiKey, {
-    intervalMs: 10 * 1000,
-    timeoutMs: 30 * 60 * 1000,
-    onTick: (info) => {
-      setStatus(waitingStatusText(model, info.tick, info.elapsedMs));
-    },
-  });
-
-  const st = result.status;
-  const raw = result.raw || {};
-
-  if (st !== "success") {
-    setStatus(`${model} ${st} / ${st}`, st === "failed" ? "err" : "info");
-    addOutputItem({
-      title: `${model} 任务结束：${st} / Task ended: ${st}`,
-      rawJson: raw,
-      meta: `task_id=${taskId}`,
-    });
-    return;
-  }
-
-  const fileUrl = raw?.output?.file_url;
-  const textRes = raw?.output?.text_result;
-
-  if (fileUrl) {
-    const blobInfo = await fetchAsBlob(fileUrl, "video");
-    const video = document.createElement("video");
-    video.src = blobInfo.objUrl;
-    video.controls = true;
-    video.playsInline = true;
-
-    addOutputItem({
-      title: `${model} 输出视频 / Output`,
-      meta: `task_id=${taskId} • file_url=${fileUrl}`,
-      element: video,
-      rawJson: raw,
-      download: { href: blobInfo.objUrl, filename: `video-${nowTs()}.mp4` },
-      openUrl: openAfter ? fileUrl : null,
-    });
-
-    setStatus(`${model} 成功 / Success`, "ok");
-  } else if (textRes) {
-    addOutputItem({
-      title: `${model} 文本输出 / Text output`,
-      meta: `task_id=${taskId}`,
-      rawJson: raw,
-    });
-    setStatus(`${model} 成功 / Success`, "ok");
-  } else {
-    addOutputItem({
-      title: `${model} 成功但无输出 / Success but no output`,
-      meta: `task_id=${taskId}`,
-      rawJson: raw,
-    });
-    setStatus(`${model} 成功 / Success`, "ok");
-  }
-}
-
-// -------- Text-to-Image (已完美对齐 API 文档与分辨率格式) --------
-async function runTextToImage() {
-  const apiKey = getApiKey();
-  rememberKeyMaybe();
-
-  const model = $("modelSel").value;
-  const prompt = $("zPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
-
-  const n = clampInt($("zN").value, 1, 4, 1);
-  const [w, h] = Z_RESOLUTIONS[$("zRes").value];
-  const size = `${w}x${h}`; // 使用标准的小写 x 分隔符
-
-  // 补充获取界面上的额外参数（如果存在）
-  const steps = clampInt($("zSteps")?.value, 1, 50, 4);
-  const cfg = clampFloat($("zCfg")?.value, 0, 20, 1.0);
-  const seed = clampInt($("zSeed")?.value, -1, 2147483647, -1);
-  const negPrompt = $("zNegPrompt")?.value || "";
-
-  setStatus(`${model} 生成中... / Generating...`);
+  setStatus(`${model} (${size}) 生成中... / Generating...`);[span_105](start_span)[span_105](end_span)
   
-  // 完整构造符合 Gitee API 规范的 payload
+  // 严格对齐官方 API 文档中的 extra_body 参数及高画质步数
+  const isTurbo = model === "z-image-turbo";
   const payload = { 
     prompt, 
     model, 
     n, 
-    size,
+    size, 
+    seed,
     extra_body: {
       width: 0,
       height: 0,
-      num_inference_steps: steps,
-      cfg_scale: cfg,
-      seed: seed >= 0 ? seed : 0,
-      negative_prompt: negPrompt,
+      num_inference_steps: isTurbo ? 9 : 4,
+      cfg_scale: 1,
+      seed: seed,
+      negative_prompt: "",
       lora_weights: [],
       lora_scale: 0
     }
-  };
+  };[span_106](start_span)[span_106](end_span)
 
   const headers = {
     "Authorization": `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
+    "Content-Type": "application/json"
   };
-
-  if (model === "Z-Image-Turbo") {
+  
+  // 针对 turbo 模型开启容灾/高分辨率支持头
+  if (isTurbo) {
     headers["X-Failover-Enabled"] = "true";
   }
 
-  const res = await apiFetch("images/generations", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
+  const res = await apiFetch("images/generations", {[span_107](start_span)[span_107](end_span)
+    method: "POST",[span_108](start_span)[span_108](end_span)
+    headers,[span_109](start_span)[span_109](end_span)
+    body: JSON.stringify(payload),[span_110](start_span)[span_110](end_span)
   });
 
-  const j = await readJsonSafely(res);
-  if (!res.ok) {
-    setStatus(`${model} 失败 / Failed`, "err");
-    addOutputItem({ title: `${model} 生成失败 / Failed`, rawJson: j, meta: `HTTP ${res.status}` });
-    throw new Error(`API 错误 / API Error (${res.status})`);
+  const j = await readJsonSafely(res);[span_111](start_span)[span_111](end_span)
+  if (!res.ok) {[span_112](start_span)[span_112](end_span)
+    setStatus(`${model} 失败 / Failed`, "err");[span_113](start_span)[span_113](end_span)
+    addOutputItem({ title: `${model} 生成失败 / Failed`, rawJson: j, meta: `HTTP ${res.status}` });[span_114](start_span)[span_114](end_span)
+    throw new Error(`API 错误 / API Error (${res.status})`);[span_115](start_span)[span_115](end_span)
   }
 
-  const data = Array.isArray(j.data) ? j.data : [];
-  if (!data.length) {
-    addOutputItem({ title: `${model} 返回无数据 / Empty response`, rawJson: j });
-    setStatus(`${model} 失败 / Failed`, "err");
-    return;
+  const data = Array.isArray(j.data) ? j.data : [];[span_116](start_span)[span_116](end_span)
+  if (!data.length) {[span_117](start_span)[span_117](end_span)
+    addOutputItem({ title: `${model} 返回无数据 / Empty response`, rawJson: j });[span_118](start_span)[span_118](end_span)
+    setStatus(`${model} 失败 / Failed`, "err");[span_119](start_span)[span_119](end_span)
+    return;[span_120](start_span)[span_120](end_span)
   }
 
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i] || {};
-    let blobInfo = null;
+  for (let i = 0; i < data.length; i++) {[span_121](start_span)[span_121](end_span)
+    const item = data[i] || {};[span_122](start_span)[span_122](end_span)
+    let blobInfo = null;[span_123](start_span)[span_123](end_span)
 
-    if (item.url) {
-      blobInfo = await fetchAsBlob(item.url, "image");
-    } else if (item.b64_json) {
-      const byteChars = atob(item.b64_json);
-      const bytes = new Uint8Array(byteChars.length);
-      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
-      const blob = new Blob([bytes], { type: "image/png" });
-      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
-    } else {
-      addOutputItem({ title: `${model} 第${i+1}张无数据 / No image data`, rawJson: item });
-      continue;
+    if (item.url) {[span_124](start_span)[span_124](end_span)
+      blobInfo = await fetchAsBlob(item.url);[span_125](start_span)[span_125](end_span)
+    } else if (item.b64_json) {[span_126](start_span)[span_126](end_span)
+      const byteChars = atob(item.b64_json);[span_127](start_span)[span_127](end_span)
+      const bytes = new Uint8Array(byteChars.length);[span_128](start_span)[span_128](end_span)
+      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);[span_129](start_span)[span_129](end_span)
+      const blob = new Blob([bytes], { type: "image/png" });[span_130](start_span)[span_130](end_span)
+      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };[span_131](start_span)[span_131](end_span)
+    } else {[span_132](start_span)[span_132](end_span)
+      addOutputItem({ title: `${model} 第${i+1}张无数据 / No image data`, rawJson: item });[span_133](start_span)[span_133](end_span)
+      continue;[span_134](start_span)[span_134](end_span)
     }
 
-    const img = document.createElement("img");
-    img.src = blobInfo.objUrl;
+    const img = document.createElement("img");[span_135](start_span)[span_135](end_span)
+    img.src = blobInfo.objUrl;[span_136](start_span)[span_136](end_span)
 
-    const filename = `${model}-${nowTs()}-${i+1}.png`;
-    addOutputItem({
-      title: `${model} 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
-      element: img,
-      download: { href: blobInfo.objUrl, filename },
+    const filename = `${model}-${size}-${nowTs()}-${i+1}.png`;[span_137](start_span)[span_137](end_span)
+    addOutputItem({[span_138](start_span)[span_138](end_span)
+      title: `${model} 输出 #${i+1} (${size})`,[span_139](start_span)[span_139](end_span)
+      meta: `model=${model}, size=${size}, seed=${seed}, n=${n}`,[span_140](start_span)[span_140](end_span)
+      element: img,[span_141](start_span)[span_141](end_span)
+      download: { href: blobInfo.objUrl, filename },[span_142](start_span)[span_142](end_span)
     });
   }
 
-  setStatus(`${model} 成功 / Success`, "ok");
+  setStatus(`${model} 成功 / Success`, "ok");[span_143](start_span)[span_143](end_span)
 }
 
-// -------- Image Edit & Process --------
-async function runEdit() {
-  const apiKey = getApiKey();
-  rememberKeyMaybe();
-
-  const model = $("modelSel").value;
-  const f1 = $("editImg1").files?.[0];
-  const f2 = $("editImg2").files?.[0];
-  const prompt = $("editPrompt").value.trim();
-
-  if (!f1) throw new Error("请至少上传主图片 / Please upload at least image 1");
-
-  const fd = new FormData();
-  fd.append("model", model);
-  if (prompt) fd.append("prompt", prompt);
-  fd.append("image", f1, f1.name);
-  if (f2) fd.append("image", f2, f2.name);
-
-  if (model === "Qwen-Image-Edit-2511" || model === "Qwen-Image-Edit" || model === "LongCat-Image-Edit") {
-    if (!f2 || !prompt) throw new Error("该图像编辑模型需要2张图片和提示词 / This edit model requires 2 images and a prompt");
-    const taskTypes = Array.from(document.querySelectorAll("input[name='editTaskType']:checked")).map(x => x.value);
-    for (const t of taskTypes) fd.append("task_types", t);
-    fd.append("num_inference_steps", String(clampInt($("editSteps").value, 1, 50, 4)));
-    fd.append("guidance_scale", String(clampFloat($("editGuidance").value, 0, 10, 1.0)));
+// ---- 初始化 UI ----
+function initUi() {[span_144](start_span)[span_144](end_span)
+  const zRes = $("zRes");[span_145](start_span)[span_145](end_span)
+  for (const k of Object.keys(Z_RESOLUTIONS)) {[span_146](start_span)[span_146](end_span)
+    const o = document.createElement("option");[span_147](start_span)[span_147](end_span)
+    o.value = k; o.textContent = k;[span_148](start_span)[span_148](end_span)
+    zRes.appendChild(o);[span_149](start_span)[span_149](end_span)
   }
+  zRes.value = Object.keys(Z_RESOLUTIONS)[0];[span_150](start_span)[span_150](end_span)
 
-  setStatus(`${model} 处理中... / Processing...`);
-  
-  const isAsync = model.includes("Edit") || model.includes("LongCat");
-
-  let res, j;
-  if (isAsync) {
-    res = await apiFetch("async/images/edits", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}` },
-      body: fd,
-    });
-    j = await readJsonSafely(res);
-    if (!res.ok || !j.task_id) {
-      setStatus(`${model} 创建失败 / Create failed`, "err");
-      addOutputItem({ title: `${model} 创建任务失败`, meta: `HTTP ${res.status}`, rawJson: j });
-      throw new Error("创建任务失败 / Create failed");
-    }
-
-    const taskId = j.task_id;
-    setStatus(`${model} 任务已创建，开始轮询... (${taskId.slice(0,8)})`);
-
-    const result = await pollTask(taskId, apiKey, {
-      intervalMs: 6000,
-      onTick: (info) => {
-        setStatus(waitingStatusText(model, info.tick, info.elapsedMs, `task=${taskId.slice(0,8)}`));
-      },
-    });
-
-    addOutputItem({ title: `${model} 任务结果 task=${taskId.slice(0,8)}`, rawJson: result.raw });
-
-    if (result.status !== "success") {
-      setStatus(`${model} 失败 / Failed`, "err");
-      throw new Error(`任务失败 / Task failed: ${result.status}`);
-    }
-
-    const fileUrl = result.raw?.output?.file_url;
-    if (!fileUrl) throw new Error("success 但没有 file_url / no file_url");
-
-    const { objUrl } = await fetchAsBlob(fileUrl, "image");
-    const img = document.createElement("img");
-    img.src = objUrl;
-
-    addOutputItem({
-      title: `${model} 处理结果`,
-      meta: `task_id=${taskId}`,
-      element: img,
-      download: { href: objUrl, filename: `${model}-${nowTs()}.png` },
-      openUrl: $("editOpenUrl").checked ? fileUrl : null,
-    });
-
-    setStatus(`${model} 成功 / Success`, "ok");
-  } else {
-    res = await apiFetch("images/generations", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}` },
-      body: fd,
-    });
-    j = await readJsonSafely(res);
-    if (!res.ok) {
-      setStatus(`${model} 失败 / Failed`, "err");
-      addOutputItem({ title: `${model} 处理失败`, rawJson: j });
-      throw new Error(`API 错误 (${res.status})`);
-    }
-
-    const data = Array.isArray(j.data) ? j.data : [];
-    const item = data[0] || j;
-    const url = item.url || item.file_url;
-    if (!url) {
-      addOutputItem({ title: `${model} 返回无图像链接`, rawJson: j });
-      return;
-    }
-
-    const { objUrl } = await fetchAsBlob(url, "image");
-    const img = document.createElement("img");
-    img.src = objUrl;
-
-    addOutputItem({
-      title: `${model} 处理结果`,
-      element: img,
-      download: { href: objUrl, filename: `${model}-${nowTs()}.png` },
-    });
-    setStatus(`${model} 成功 / Success`, "ok");
-  }
-}
-
-// -------- Wan Video --------
-function applyWanResolution() {
-  const key = $("wanResPreset").value;
-  const [w, h] = WAN_RES_PRESETS[key];
-  $("wanW").value = String(w);
-  $("wanH").value = String(h);
-}
-
-function applyWanPreset() {
-  const p = $("wanPreset").value;
-  let steps = 30;
-  let guidance = 5.0;
-  let fps = 24;
-
-  if (p.includes("更清晰")) { steps = 60; guidance = 6.0; }
-  else if (p.includes("更动感")) { steps = 40; guidance = 5.0; fps = 30; }
-  else if (p.includes("更快")) { steps = 20; guidance = 4.0; }
-
-  $("wanSteps").value = String(steps);
-  $("wanGuidance").value = String(guidance);
-  $("wanFps").value = String(fps);
-
-  if ($("wanAutoFrames").checked) {
-    $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
-  }
-}
-
-function buildWanFormData({
-  imageFile, prompt, model, numInferenceSteps, numFrames, guidanceScale,
-  width, height, negativePrompt, seed, watermark, promptExtend, useTypoField=false
-}) {
-  const fd = new FormData();
-  fd.append("prompt", prompt);
-  fd.append("model", model);
-  fd.append("num_frames", String(numFrames));
-  fd.append("guidance_scale", String(guidanceScale));
-  fd.append("height", String(height));
-  fd.append("width", String(width));
-  if (negativePrompt?.trim()) fd.append("negative_prompt", negativePrompt.trim());
-  if (seed !== null && seed !== undefined) fd.append("seed", String(seed));
-  if (watermark !== null && watermark !== undefined) fd.append("watermark", watermark ? "true" : "false");
-  if (promptExtend !== null && promptExtend !== undefined) fd.append("prompt_extend", promptExtend ? "true" : "false");
-  fd.append(useTypoField ? "num_inferenece_steps" : "num_inference_steps", String(numInferenceSteps));
-  if (imageFile) fd.append("image", imageFile, imageFile.name);
-  return fd;
-}
-
-async function createWanTask(apiKey, params) {
-  let fd = buildWanFormData({ ...params, useTypoField:false });
-  let res = await apiFetch("async/videos/image-to-video", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}` },
-    body: fd,
-  });
-  let j = await readJsonSafely(res);
-  if (res.ok && j.task_id) return { ok:true, res, json:j, tried:"num_inference_steps" };
-
-  fd = buildWanFormData({ ...params, useTypoField:true });
-  res = await apiFetch("async/videos/image-to-video", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${apiKey}` },
-    body: fd,
-  });
-  const j2 = await readJsonSafely(res);
-  if (res.ok && j2.task_id) return { ok:true, res, json:j2, tried:"num_inferenece_steps" };
-
-  return { ok:false, res, json:{ _try1: j, _try2: j2 }, tried:"both" };
-}
-
-async function ensureJsZip() {
-  if (window.JSZip) return window.JSZip;
-  const script = document.createElement("script");
-  script.src = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
-  script.crossOrigin = "anonymous";
-  document.head.appendChild(script);
-  await new Promise((resolve, reject) => {
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("加载 JSZip 失败 / Failed to load JSZip"));
-  });
-  return window.JSZip;
-}
-
-async function zipAndDownloadMp4s(files, zipName) {
-  const JSZip = await ensureJsZip();
-  const zip = new JSZip();
-  for (const f of files) {
-    zip.file(f.name, f.blob);
-  }
-  const blob = await zip.generateAsync({ type: "blob" });
-  downloadBlob(blob, zipName);
-}
-
-async function runWan() {
-  const apiKey = getApiKey();
-  rememberKeyMaybe();
-
-  const model = $("modelSel").value;
-  const img = $("wanImg").files?.[0];
-  const prompt = $("wanPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
-
-  const neg = $("wanNeg").value.trim();
-  const width = clampInt($("wanW").value, 64, 2048, 832);
-  const height = clampInt($("wanH").value, 64, 2048, 480);
-  const steps = clampInt($("wanSteps").value, 1, 100, 30);
-  const guidance = clampFloat($("wanGuidance").value, 0, 20, 5.0);
-
-  const fps = clampInt($("wanFps").value, 1, 60, 24);
-  const duration = clampFloat($("wanDuration").value, 0.5, 60, 5.0);
-
-  let numFrames;
-  if ($("wanAutoFrames").checked) {
-    numFrames = Math.max(1, Math.min(300, fps * 5));
-    $("wanFrames").value = String(numFrames);
-  } else {
-    numFrames = clampInt($("wanFrames").value, 1, 300, 30);
-  }
-
-  const seedVal = clampInt($("wanSeed").value, -1, 2147483647, -1);
-  const seed = seedVal < 0 ? null : seedVal;
-
-  const watermark = $("wanWatermark").checked;
-  const promptExtend = $("wanPromptExtend").checked;
-
-  const segmentLen = 5.0;
-  const segCount = Math.max(1, Math.ceil(duration / segmentLen));
-  const segments = [];
-
-  for (let i = 0; i < segCount; i++) {
-    setStatus(`${model} 分段 ${i+1}/${segCount} 创建中...`);
-
-    const create = await createWanTask(apiKey, {
-      imageFile: img,
-      prompt,
-      model: model,
-      numInferenceSteps: steps,
-      numFrames,
-      guidanceScale: guidance,
-      width,
-      height,
-      negativePrompt: neg,
-      seed,
-      watermark,
-      promptExtend,
-    });
-
-    if (!create.ok) {
-      setStatus(`${model} 创建失败`, "err");
-      addOutputItem({
-        title: `${model} 创建任务失败（分段 ${i+1}）`,
-        meta: `tried=${create.tried}, HTTP ${create.res.status}`,
-        rawJson: create.json,
-      });
-      throw new Error("创建任务失败 / Create failed");
-    }
-
-    const taskId = create.json.task_id;
-    setStatus(`${model} 分段 ${i+1}/${segCount} 任务已创建，轮询中... (${taskId.slice(0,8)})`);
-
-    const result = await pollTask(taskId, apiKey, {
-      timeoutMs: 60*60*1000,
-      intervalMs: 8000,
-      onTick: (info) => {
-        setStatus(waitingStatusText(`${model} 分段 ${i+1}/${segCount}`, info.tick, info.elapsedMs, `task=${taskId.slice(0,8)}`));
-      },
-    });
-
-    addOutputItem({ title: `${model} 分段 ${i+1} 任务结果`, rawJson: result.raw, meta: `task_id=${taskId}` });
-
-    if (result.status !== "success") {
-      setStatus(`${model} 失败`, "err");
-      throw new Error(`任务失败: ${result.status}`);
-    }
-
-    const fileUrl = result.raw?.output?.file_url;
-    if (!fileUrl) throw new Error("success 但没有 file_url");
-
-    setStatus(`${model} 分段 ${i+1}/${segCount} 下载中...`);
-    const dl = await fetchAsBlob(fileUrl, "video");
-    const name = `video_seg${i+1}_${nowTs()}.mp4`;
-
-    segments.push({ name, blob: dl.blob, objUrl: dl.objUrl, fileUrl, taskId });
-
-    const video = document.createElement("video");
-    video.controls = true;
-    video.src = dl.objUrl;
-
-    addOutputItem({
-      title: `${model} 输出视频（分段 ${i+1}/${segCount}）`,
-      meta: `width=${width}, height=${height}, frames=${numFrames}`,
-      element: video,
-      download: { href: dl.objUrl, filename: name },
-      openUrl: $("wanOpenUrl").checked ? fileUrl : null,
-    });
-  }
-
-  if (segCount > 1 && $("wanZipSegments").checked) {
-    try {
-      setStatus("打包 zip 中...");
-      await zipAndDownloadMp4s(segments, `video_segments_${nowTs()}.zip`);
-      setStatus("成功 / Success", "ok");
-    } catch (e) {
-      addOutputItem({ title: "zip 打包失败", meta: String(e) });
-      setStatus("成功（但 zip 失败）", "ok");
-    }
-  } else {
-    setStatus("成功 / Success", "ok");
-  }
-}
-
-// ---- init UI ----
-function initUi() {
-  const zRes = $("zRes");
-  for (const k of Object.keys(Z_RESOLUTIONS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    zRes.appendChild(o);
-  }
-  zRes.value = Object.keys(Z_RESOLUTIONS)[0];
-
-  const wanRes = $("wanResPreset");
-  for (const k of Object.keys(WAN_RES_PRESETS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    wanRes.appendChild(o);
-  }
-  wanRes.value = Object.keys(WAN_RES_PRESETS)[0];
-  applyWanResolution();
-
-  const box = $("editTaskTypes");
-  for (const t of EDIT_TASK_TYPES) {
-    const label = document.createElement("label");
-    label.className = "chk";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.name = "editTaskType";
-    input.value = t;
-    input.checked = (t === "id" || t === "style");
-    label.appendChild(input);
-    label.appendChild(document.createTextNode(" " + t));
-    box.appendChild(label);
-  }
-
-  $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
-  showPanel($("modelSel").value);
-
-  $("btnZRun").onclick = async () => {
-    try { await runTextToImage(); }
-    catch (e) { addOutputItem({ title:"生成错误 / Error", meta:String(e) }); }
-  };
-  $("btnEditRun").onclick = async () => {
-    try { await runEdit(); }
-    catch (e) { addOutputItem({ title:"图像处理错误 / Error", meta:String(e) }); }
-  };
-  $("btnWanRun").onclick = async () => {
-    try { await runWan(); }
-    catch (e) { addOutputItem({ title:"视频生成错误 / Error", meta:String(e) }); }
+  $("btnZRun").onclick = async () => {[span_151](start_span)[span_151](end_span)
+    try { await runZImage(); }[span_152](start_span)[span_152](end_span)
+    catch (e) { addOutputItem({ title:"生成错误 / Error", meta:String(e) }); }[span_153](start_span)[span_153](end_span)
   };
 
-  $("btnHyRun").onclick = async () => {
-    try { await runHunyuanVideo(); }
-    catch (e) { addOutputItem({ title:"异步视频错误 / Error", meta:String(e) }); }
-  };
+  $("btnClearOutput").onclick = clearOutput;[span_154](start_span)[span_154](end_span)
+  $("btnClearKey").onclick = clearRememberedKey;[span_155](start_span)[span_155](end_span)
 
-  $("btnClearOutput").onclick = clearOutput;
-
-  $("btnWanApplyPreset").onclick = applyWanPreset;
-  $("wanResPreset").addEventListener("change", applyWanResolution);
-  $("wanAutoFrames").addEventListener("change", () => {
-    if ($("wanAutoFrames").checked) {
-      const fps = clampInt($("wanFps").value, 1, 60, 24);
-      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
-    }
-  });
-  $("wanFps").addEventListener("change", () => {
-    if ($("wanAutoFrames").checked) {
-      const fps = clampInt($("wanFps").value, 1, 60, 24);
-      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
-    }
-  });
-
-  $("btnClearKey").onclick = clearRememberedKey;
-
-  loadRememberedKey();
+  loadRememberedKey();[span_156](start_span)[span_156](end_span)
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  initUi();
-  setStatus("准备就绪 / Ready");
+window.addEventListener("DOMContentLoaded", () => {[span_157](start_span)[span_157](end_span)
+  initUi();[span_158](start_span)[span_158](end_span)
+  setStatus("准备就绪 / Ready");[span_159](start_span)[span_159](end_span)
 });
