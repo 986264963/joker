@@ -54,7 +54,7 @@ const WAN_RES_PRESETS = {
   "2048 方图 / 2048x2048 (高成本)": [2048, 2048],
 };
 
-const WAN_SEGMENT_DURATION = 5.0; // 单段时长（秒）
+const WAN_SEGMENT_DURATION = 5.0;
 
 // -------- 工具函数 --------
 function nowTs() {
@@ -271,6 +271,7 @@ function addOutputItem({title, kind="info", meta="", element=null, rawJson=null,
 
 function clearOutput() {
   _revokeAllObjectUrls();
+
   const out = $("output");
   const media = out.querySelectorAll("img, video");
   for (const el of media) {
@@ -278,6 +279,12 @@ function clearOutput() {
       URL.revokeObjectURL(el.src);
     }
   }
+
+  const links = out.querySelectorAll("a[href^='blob:']");
+  for (const el of links) {
+    URL.revokeObjectURL(el.href);
+  }
+
   out.innerHTML = "";
   setStatus("输出已清空");
 }
@@ -404,7 +411,7 @@ async function runZImage() {
   await renderImageItems(j, "z-image-turbo", { size, n });
 }
 
-// -------- Z-Image (同步，修复语法及参数) --------
+// -------- Z-Image (同步，已移除 width/height) --------
 async function runZImageModel() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -436,8 +443,6 @@ async function runZImageModel() {
     num_inference_steps: steps,
     seed: seedVal,
     negative_prompt: negative,
-    width: 0,
-    height: 0,
     lora_weights: [],
     lora_scale: 0,
     num_images_per_prompt: numImages,
@@ -459,7 +464,7 @@ async function runZImageModel() {
   await renderImageItems(j, "Z-Image", { size, seed: String(seedVal), n: numImages });
 }
 
-// -------- Qwen-Image (异步，移除 width/height，种子整数) --------
+// -------- Qwen-Image (异步，超时30分钟，已移除 width/height) --------
 async function runQwenImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -482,7 +487,6 @@ async function runQwenImage() {
 
   const negative = $("qiNeg").value.trim();
 
-  // ✅ 已移除 width 和 height
   const payload = {
     prompt,
     model: "Qwen-Image",
@@ -512,9 +516,10 @@ async function runQwenImage() {
   const taskId = j.task_id;
   addOutputItem({ title: "Qwen-Image 任务已创建", meta: `task_id=${taskId}`, rawJson: j });
 
+  // 超时30分钟，间隔5秒
   const result = await pollTask(taskId, apiKey, {
-    timeoutMs: 10 * 60 * 1000,
-    intervalMs: 3000,
+    timeoutMs: 30 * 60 * 1000,
+    intervalMs: 5000,
     onTick: (info) => {
       setStatus(waitingStatusText(`Qwen-Image (${taskId.slice(0,8)})`, info.tick, info.elapsedMs));
     },
@@ -547,7 +552,7 @@ async function runQwenImage() {
   setStatus("Qwen-Image 成功", "ok");
 }
 
-// -------- Qwen-Image-2512 (同步，修复参数) --------
+// -------- Qwen-Image-2512 (同步，已移除 width/height) --------
 async function runQwenImage2512() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -572,8 +577,6 @@ async function runQwenImage2512() {
     cfg_scale: cfg,
     seed: seedVal,
     negative_prompt: negative,
-    width: 0,
-    height: 0,
     lora_weights: [],
     lora_scale: 0,
   };
@@ -594,7 +597,7 @@ async function runQwenImage2512() {
   await renderImageItems(j, "Qwen-Image-2512", { size, seed: String(seedVal), n: 1 });
 }
 
-// -------- Edit-2511 (不变) --------
+// -------- Edit-2511 --------
 async function runEdit() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -669,7 +672,7 @@ async function runEdit() {
   setStatus("Edit-2511 成功", "ok");
 }
 
-// -------- Wan2.2 (不变，仅将硬编码替换为常量) --------
+// -------- Wan2.2 --------
 function applyWanResolution() {
   const key = $("wanResPreset").value;
   const [w, h] = WAN_RES_PRESETS[key];
@@ -874,7 +877,7 @@ async function runWan() {
   }
 }
 
-// -------- HunyuanVideo (不变) --------
+// -------- HunyuanVideo --------
 async function runHunyuanVideo() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -971,7 +974,6 @@ async function runHunyuanVideo() {
 // ============================================================
 
 function initUi() {
-  // 填充所有分辨率下拉框
   const fillSelect = (id, map, defaultKey) => {
     const sel = $(id);
     if (!sel) return;
@@ -991,7 +993,6 @@ function initUi() {
   fillSelect('qiRes', QWEN_RESOLUTIONS, '1:1 (2048x2048)');
   fillSelect('q2Res', QWEN2512_RESOLUTIONS, '9:16 (1152x2048)');
 
-  // Wan 分辨率预设
   const wanRes = $('wanResPreset');
   for (const k of Object.keys(WAN_RES_PRESETS)) {
     const o = document.createElement('option');
@@ -1002,7 +1003,6 @@ function initUi() {
   wanRes.value = Object.keys(WAN_RES_PRESETS)[0];
   applyWanResolution();
 
-  // Edit 任务类型
   const box = $('editTaskTypes');
   for (const t of EDIT_TASK_TYPES) {
     const label = document.createElement('label');
@@ -1017,11 +1017,9 @@ function initUi() {
     box.appendChild(label);
   }
 
-  // 模型切换
   $('modelSel').addEventListener('change', (e) => showPanel(e.target.value));
   showPanel($('modelSel').value);
 
-  // 按钮事件
   $('btnZRun').onclick = async () => {
     try { await runZImage(); }
     catch (e) { addOutputItem({ title: 'z-image-turbo 错误', meta: String(e) }); }
