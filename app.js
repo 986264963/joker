@@ -374,7 +374,7 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
 // 2. 各模型功能函数
 // ============================================================
 
-// -------- z-image-turbo (原有，已调整为使用 renderImageItems) --------
+// -------- z-image-turbo --------
 async function runZImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -404,7 +404,7 @@ async function runZImage() {
   await renderImageItems(j, "z-image-turbo", { size, n });
 }
 
-// -------- Z-Image (同步，修复 seed 为整数，去掉 extra_body) --------
+// -------- Z-Image (同步，修复语法及参数) --------
 async function runZImageModel() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -459,7 +459,7 @@ async function runZImageModel() {
   await renderImageItems(j, "Z-Image", { size, seed: String(seedVal), n: numImages });
 }
 
-// -------- Qwen-Image (异步，种子改为整数) --------
+// -------- Qwen-Image (异步，移除 width/height，种子整数) --------
 async function runQwenImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -482,13 +482,12 @@ async function runQwenImage() {
 
   const negative = $("qiNeg").value.trim();
 
+  // ✅ 已移除 width 和 height
   const payload = {
     prompt,
     model: "Qwen-Image",
     size,
     num_images_per_prompt: numImages,
-    width: 0,
-    height: 0,
     num_inference_steps: steps,
     cfg_scale: cfg,
     seed: seedVal,
@@ -548,7 +547,7 @@ async function runQwenImage() {
   setStatus("Qwen-Image 成功", "ok");
 }
 
-// -------- Qwen-Image-2512 (同步，种子整数，去掉 extra_body) --------
+// -------- Qwen-Image-2512 (同步，修复参数) --------
 async function runQwenImage2512() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -670,7 +669,7 @@ async function runEdit() {
   setStatus("Edit-2511 成功", "ok");
 }
 
-// -------- Wan2.2 (原有，仅将硬编码替换为常量) --------
+// -------- Wan2.2 (不变，仅将硬编码替换为常量) --------
 function applyWanResolution() {
   const key = $("wanResPreset").value;
   const [w, h] = WAN_RES_PRESETS[key];
