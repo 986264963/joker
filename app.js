@@ -25,6 +25,40 @@ const WAN_RES_PRESETS = {
   "2048 方图 / 2048x2048 (高成本 / Expensive)": [2048, 2048],
 };
 
+// Z-Image Standard 分辨率
+const Z_STD_RESOLUTIONS = {
+  "1:1 (256x256)": [256, 256],
+  "1:1 (512x512)": [512, 512],
+  "1:1 (1024x1024)": [1024, 1024],
+  "4:3 (1024x768)": [1024, 768],
+  "3:4 (768x1024)": [768, 1024],
+  "16:9 (1024x576)": [1024, 576],
+  "9:16 (576x1024)": [576, 1024],
+  "3:2 (1024x640)": [1024, 640],
+};
+
+// Qwen-Image-2512 分辨率
+const QWEN2512_RESOLUTIONS = {
+  "4:3 (2048x1536)": [2048, 1536],
+  "3:4 (1536x2048)": [1536, 2048],
+  "3:2 (2048x1360)": [2048, 1360],
+  "2:3 (1360x2048)": [1360, 2048],
+  "16:9 (2048x1152)": [2048, 1152],
+  "9:16 (1152x2048)": [1152, 2048],
+};
+
+// Qwen-Image 分辨率
+const QWEN_RESOLUTIONS = {
+  "1:1 (2048x2048)": [2048, 2048],
+  "4:3 (2048x1536)": [2048, 1536],
+  "3:4 (1536x2048)": [1536, 2048],
+  "3:2 (2048x1360)": [2048, 1360],
+  "2:3 (1360x2048)": [1360, 2048],
+  "16:9 (2048x1152)": [2048, 1152],
+  "9:16 (1152x2048)": [1152, 2048],
+};
+
+
 function nowTs() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -81,10 +115,10 @@ function clearRememberedKey() {
 }
 
 function showPanel(model) {
-  $("panelZ").style.display = model === "z-image" ? "block" : "none";
-  $("panelZTurbo").style.display = model === "z-image-turbo" ? "block" : "none";
-  $("panelQwenImg").style.display = model === "Qwen-Image" ? "block" : "none";
-  $("panelQwenImg2512").style.display = model === "Qwen-Image-2512" ? "block" : "none";
+  $("panelZ").style.display = model === "z-image-turbo" ? "block" : "none";
+  $("panelZStd").style.display = model === "z-image" ? "block" : "none";
+  $("panelQwen2512").style.display = model === "Qwen-Image-2512" ? "block" : "none";
+  $("panelQwen").style.display = model === "Qwen-Image" ? "block" : "none";
   $("panelEdit").style.display = model === "Edit-2511" ? "block" : "none";
   $("panelWan").style.display = model === "Wan2.2-I2V-A14B" ? "block" : "none";
   $("panelHunyuan").style.display = model === "HunyuanVideo-1.5" ? "block" : "none";
@@ -168,7 +202,7 @@ function clearOutput() {
 
 // Same-origin proxy to ai.gitee.com/v1
 async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
-  const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
+  const res = await fetch(`/api/${path.replace(/^\s*\/+/, "")}`, {
     method,
     headers,
     body,
@@ -393,7 +427,7 @@ async function runHunyuanVideo() {
   }
 }
 
-// -------- z-image --------
+// -------- z-image (Turbo) --------
 async function runZImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -405,30 +439,8 @@ async function runZImage() {
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}x${h}`;
 
-  const guidance_scale = clampFloat($("zGuidance").value, 1, 20, 5);
-  const num_inference_steps = clampInt($("zSteps").value, 1, 100, 30);
-  const seed = clampInt($("zSeed").value, 0, 2147483647, 0);
-  const negative_prompt = $("zNeg").value.trim();
-
   setStatus("z-image 生成中... / Generating...");
-  const payload = {
-    prompt,
-    model: "Z-Image",
-    n,
-    size,
-    extra_body: {
-      guidance_scale,
-      num_inference_steps,
-      seed: seed ? [seed] : [],
-      lora_weights: [],
-      lora_scale: 0,
-      num_images_per_prompt: 0,
-      width: 0,
-      height: 0,
-      negative_prompt
-    },
-    response_format: "url"
-  };
+  const payload = { prompt, model: "z-image-turbo", n, size };
 
   const res = await apiFetch("images/generations", {
     method: "POST",
@@ -486,136 +498,42 @@ async function runZImage() {
   setStatus("z-image 成功 / Success", "ok");
 }
 
-// -------- z-image-turbo --------
-async function runZImageTurbo() {
+
+// -------- z-image (Standard) --------
+async function runZImageStd() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
-  const prompt = $("zTurboPrompt").value.trim();
+  const prompt = $("zStdPrompt").value.trim();
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
-  const n = clampInt($("zTurboN").value, 1, 4, 1);
-  const [w, h] = Z_RESOLUTIONS[$("zTurboRes").value];
+  const n = clampInt($("zStdN").value, 1, 4, 1);
+  const [w, h] = Z_STD_RESOLUTIONS[$("zStdRes").value];
   const size = `${w}x${h}`;
 
-  const num_inference_steps = clampInt($("zTurboSteps").value, 1, 50, 9);
-  const seed = clampInt($("zTurboSeed").value, 0, 2147483647, 0);
-  const negative_prompt = $("zTurboNeg").value.trim();
-  const xFailover = $("zTurboFailover").checked;
+  const steps = clampInt($("zStdSteps").value, 1, 50, 30);
+  const guidance = clampFloat($("zStdGuidance").value, 0, 20, 5.0);
 
-  setStatus("z-image-turbo 生成中... / Generating...");
+  const seedRaw = $("zStdSeed").value;
+  const seed = Number.parseInt(String(seedRaw), 10);
+  const seedVal = Number.isFinite(seed) && seed > 0 ? seed : undefined;
+
+  const loraScale = clampFloat($("zStdLoraScale").value, 0, 1, 0);
+
+  const neg = $("zStdNeg").value.trim();
+
+  setStatus("z-image (Standard) 生成中... / Generating...");
   const payload = {
     prompt,
-    model: "z-image-turbo",
+    model: "z-image",
     n,
     size,
-    extra_body: {
-      negative_prompt,
-      width: 0,
-      height: 0,
-      num_inference_steps,
-      seed,
-      lora_weights: [],
-      lora_scale: 0
-    },
-    response_format: "url"
+    num_inference_steps: steps,
+    guidance_scale: guidance,
+    lora_scale: loraScale,
   };
-
-  const headers = {
-    "Authorization": `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-  };
-  if (xFailover) {
-    headers["X-Failover-Enabled"] = "true";
-  }
-
-  const res = await apiFetch("images/generations", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-
-  const j = await readJsonSafely(res);
-  if (!res.ok) {
-    setStatus("z-image-turbo 失败 / Failed", "err");
-    addOutputItem({ title: "z-image-turbo 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
-    throw new Error(`API 错误 / API Error (${res.status})`);
-  }
-
-  const data = Array.isArray(j.data) ? j.data : [];
-  if (!data.length) {
-    addOutputItem({ title: "z-image-turbo 返回无数据 / Empty response", rawJson: j });
-    setStatus("z-image-turbo 失败 / Failed", "err");
-    return;
-  }
-
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i] || {};
-    let blobInfo = null;
-
-    if (item.url) {
-      blobInfo = await fetchAsBlob(item.url, "image");
-    } else if (item.b64_json) {
-      const byteChars = atob(item.b64_json);
-      const bytes = new Uint8Array(byteChars.length);
-      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
-      const blob = new Blob([bytes], { type: "image/png" });
-      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
-    } else {
-      addOutputItem({ title: `z-image-turbo 第${i+1}张无数据 / No image data`, rawJson: item });
-      continue;
-    }
-
-    const img = document.createElement("img");
-    img.src = blobInfo.objUrl;
-
-    const filename = `z-image-turbo-${nowTs()}-${i+1}.png`;
-    addOutputItem({
-      title: `z-image-turbo 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
-      element: img,
-      download: { href: blobInfo.objUrl, filename },
-    });
-  }
-
-  setStatus("z-image-turbo 成功 / Success", "ok");
-}
-
-// -------- Qwen-Image --------
-async function runQwenImage() {
-  const apiKey = getApiKey();
-  rememberKeyMaybe();
-
-  const prompt = $("qwenPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
-
-  const n = clampInt($("qwenN").value, 1, 4, 1);
-  const [w, h] = Z_RESOLUTIONS[$("qwenRes").value];
-  const size = `${w}x${h}`;
-
-  const num_inference_steps = clampInt($("qwenSteps").value, 1, 100, 4);
-  const cfg_scale = clampFloat($("qwenCfg").value, 0, 20, 1);
-  const seed = clampInt($("qwenSeed").value, 0, 2147483647, 0);
-  const negative_prompt = $("qwenNeg").value.trim();
-
-  setStatus("Qwen-Image 生成中... / Generating...");
-  const payload = {
-    prompt,
-    model: "Qwen-Image",
-    n,
-    size,
-    extra_body: {
-      num_images_per_prompt: 0,
-      width: 0,
-      height: 0,
-      num_inference_steps,
-      cfg_scale,
-      seed: seed ? [seed] : [],
-      negative_prompt,
-      lora_weights: []
-    },
-    response_format: "url"
-  };
+  if (seedVal !== undefined) payload.seed = seedVal;
+  if (neg) payload.negative_prompt = neg;
 
   const res = await apiFetch("images/generations", {
     method: "POST",
@@ -628,15 +546,15 @@ async function runQwenImage() {
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("Qwen-Image 失败 / Failed", "err");
-    addOutputItem({ title: "Qwen-Image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    setStatus("z-image (Standard) 失败 / Failed", "err");
+    addOutputItem({ title: "z-image (Standard) 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
     throw new Error(`API 错误 / API Error (${res.status})`);
   }
 
   const data = Array.isArray(j.data) ? j.data : [];
   if (!data.length) {
-    addOutputItem({ title: "Qwen-Image 返回无数据 / Empty response", rawJson: j });
-    setStatus("Qwen-Image 失败 / Failed", "err");
+    addOutputItem({ title: "z-image (Standard) 返回无数据 / Empty response", rawJson: j });
+    setStatus("z-image (Standard) 失败 / Failed", "err");
     return;
   }
 
@@ -653,23 +571,23 @@ async function runQwenImage() {
       const blob = new Blob([bytes], { type: "image/png" });
       blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
     } else {
-      addOutputItem({ title: `Qwen-Image 第${i+1}张无数据 / No image data`, rawJson: item });
+      addOutputItem({ title: `z-image (Standard) 第${i+1}张无数据 / No image data`, rawJson: item });
       continue;
     }
 
     const img = document.createElement("img");
     img.src = blobInfo.objUrl;
 
-    const filename = `Qwen-Image-${nowTs()}-${i+1}.png`;
+    const filename = `z-image-std-${nowTs()}-${i+1}.png`;
     addOutputItem({
-      title: `Qwen-Image 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
+      title: `z-image (Standard) 输出 #${i+1}`,
+      meta: `size=${size}, n=${n}, steps=${steps}, guidance=${guidance}`,
       element: img,
       download: { href: blobInfo.objUrl, filename },
     });
   }
 
-  setStatus("Qwen-Image 成功 / Success", "ok");
+  setStatus("z-image (Standard) 成功 / Success", "ok");
 }
 
 // -------- Qwen-Image-2512 --------
@@ -680,33 +598,31 @@ async function runQwenImage2512() {
   const prompt = $("qwen2512Prompt").value.trim();
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
-  const n = clampInt($("qwen2512N").value, 1, 4, 1);
-  const [w, h] = Z_RESOLUTIONS[$("qwen2512Res").value];
+  const [w, h] = QWEN2512_RESOLUTIONS[$("qwen2512Res").value];
   const size = `${w}x${h}`;
 
-  const num_inference_steps = clampInt($("qwen2512Steps").value, 1, 100, 4);
-  const cfg_scale = clampFloat($("qwen2512Cfg").value, 0, 20, 1);
-  const seed = clampInt($("qwen2512Seed").value, 0, 2147483647, 0);
-  const negative_prompt = $("qwen2512Neg").value.trim();
+  const steps = clampInt($("qwen2512Steps").value, 1, 50, 4);
+  const cfgScale = clampFloat($("qwen2512Cfg").value, 0, 20, 1.0);
+
+  const seedRaw = $("qwen2512Seed").value;
+  const seed = Number.parseInt(String(seedRaw), 10);
+  const seedVal = Number.isFinite(seed) && seed >= 0 ? seed : undefined;
+
+  const loraScale = clampFloat($("qwen2512LoraScale").value, 0, 1, 0);
+
+  const neg = $("qwen2512Neg").value.trim();
 
   setStatus("Qwen-Image-2512 生成中... / Generating...");
   const payload = {
     prompt,
     model: "Qwen-Image-2512",
-    n,
     size,
-    extra_body: {
-      width: 0,
-      height: 0,
-      num_inference_steps,
-      cfg_scale,
-      seed: seed ? [seed] : [],
-      negative_prompt,
-      lora_weights: [],
-      lora_scale: 0
-    },
-    response_format: "url"
+    num_inference_steps: steps,
+    cfg_scale: cfgScale,
+    lora_scale: loraScale,
   };
+  if (seedVal !== undefined) payload.seed = seedVal;
+  if (neg) payload.negative_prompt = neg;
 
   const res = await apiFetch("images/generations", {
     method: "POST",
@@ -751,10 +667,10 @@ async function runQwenImage2512() {
     const img = document.createElement("img");
     img.src = blobInfo.objUrl;
 
-    const filename = `Qwen-Image-2512-${nowTs()}-${i+1}.png`;
+    const filename = `qwen-image-2512-${nowTs()}-${i+1}.png`;
     addOutputItem({
       title: `Qwen-Image-2512 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
+      meta: `size=${size}, steps=${steps}, cfg=${cfgScale}`,
       element: img,
       download: { href: blobInfo.objUrl, filename },
     });
@@ -762,6 +678,98 @@ async function runQwenImage2512() {
 
   setStatus("Qwen-Image-2512 成功 / Success", "ok");
 }
+
+// -------- Qwen-Image --------
+async function runQwenImage() {
+  const apiKey = getApiKey();
+  rememberKeyMaybe();
+
+  const prompt = $("qwenPrompt").value.trim();
+  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+
+  const n = clampInt($("qwenN").value, 1, 4, 1);
+  const [w, h] = QWEN_RESOLUTIONS[$("qwenRes").value];
+  const size = `${w}x${h}`;
+
+  const steps = clampInt($("qwenSteps").value, 1, 50, 4);
+  const cfgScale = clampFloat($("qwenCfg").value, 0, 20, 1.0);
+
+  const seedRaw = $("qwenSeed").value;
+  const seed = Number.parseInt(String(seedRaw), 10);
+  const seedVal = Number.isFinite(seed) && seed >= 0 ? seed : undefined;
+
+  const loraScale = clampFloat($("qwenLoraScale").value, 0, 1, 0);
+
+  const neg = $("qwenNeg").value.trim();
+
+  setStatus("Qwen-Image 生成中... / Generating...");
+  const payload = {
+    prompt,
+    model: "Qwen-Image",
+    n,
+    size,
+    num_inference_steps: steps,
+    cfg_scale: cfgScale,
+    lora_scale: loraScale,
+  };
+  if (seedVal !== undefined) payload.seed = seedVal;
+  if (neg) payload.negative_prompt = neg;
+
+  const res = await apiFetch("images/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const j = await readJsonSafely(res);
+  if (!res.ok) {
+    setStatus("Qwen-Image 失败 / Failed", "err");
+    addOutputItem({ title: "Qwen-Image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`API 错误 / API Error (${res.status})`);
+  }
+
+  const data = Array.isArray(j.data) ? j.data : [];
+  if (!data.length) {
+    addOutputItem({ title: "Qwen-Image 返回无数据 / Empty response", rawJson: j });
+    setStatus("Qwen-Image 失败 / Failed", "err");
+    return;
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i] || {};
+    let blobInfo = null;
+
+    if (item.url) {
+      blobInfo = await fetchAsBlob(item.url, "image");
+    } else if (item.b64_json) {
+      const byteChars = atob(item.b64_json);
+      const bytes = new Uint8Array(byteChars.length);
+      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
+      const blob = new Blob([bytes], { type: "image/png" });
+      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
+    } else {
+      addOutputItem({ title: `Qwen-Image 第${i+1}张无数据 / No image data`, rawJson: item });
+      continue;
+    }
+
+    const img = document.createElement("img");
+    img.src = blobInfo.objUrl;
+
+    const filename = `qwen-image-${nowTs()}-${i+1}.png`;
+    addOutputItem({
+      title: `Qwen-Image 输出 #${i+1}`,
+      meta: `size=${size}, n=${n}, steps=${steps}, cfg=${cfgScale}`,
+      element: img,
+      download: { href: blobInfo.objUrl, filename },
+    });
+  }
+
+  setStatus("Qwen-Image 成功 / Success", "ok");
+}
+
 
 // -------- Edit-2511 --------
 async function runEdit() {
@@ -1087,29 +1095,32 @@ function initUi() {
   }
   zRes.value = Object.keys(Z_RESOLUTIONS)[0];
 
-  const zTurboRes = $("zTurboRes");
-  for (const k of Object.keys(Z_RESOLUTIONS)) {
+  // Z-Image Standard resolutions
+  const zStdRes = $("zStdRes");
+  for (const k of Object.keys(Z_STD_RESOLUTIONS)) {
     const o = document.createElement("option");
     o.value = k; o.textContent = k;
-    zTurboRes.appendChild(o);
+    zStdRes.appendChild(o);
   }
-  zTurboRes.value = Object.keys(Z_RESOLUTIONS)[0];
+  zStdRes.value = Object.keys(Z_STD_RESOLUTIONS)[0];
 
-  const qwenRes = $("qwenRes");
-  for (const k of Object.keys(Z_RESOLUTIONS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    qwenRes.appendChild(o);
-  }
-  qwenRes.value = Object.keys(Z_RESOLUTIONS)[0];
-
+  // Qwen-Image-2512 resolutions
   const qwen2512Res = $("qwen2512Res");
-  for (const k of Object.keys(Z_RESOLUTIONS)) {
+  for (const k of Object.keys(QWEN2512_RESOLUTIONS)) {
     const o = document.createElement("option");
     o.value = k; o.textContent = k;
     qwen2512Res.appendChild(o);
   }
-  qwen2512Res.value = Object.keys(Z_RESOLUTIONS)[0];
+  qwen2512Res.value = Object.keys(QWEN2512_RESOLUTIONS)[0];
+
+  // Qwen-Image resolutions
+  const qwenRes = $("qwenRes");
+  for (const k of Object.keys(QWEN_RESOLUTIONS)) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    qwenRes.appendChild(o);
+  }
+  qwenRes.value = Object.keys(QWEN_RESOLUTIONS)[0];
 
   const wanRes = $("wanResPreset");
   for (const k of Object.keys(WAN_RES_PRESETS)) {
@@ -1144,18 +1155,6 @@ function initUi() {
     try { await runZImage(); }
     catch (e) { addOutputItem({ title:"z-image 错误 / Error", meta:String(e) }); }
   };
-  $("btnZTurboRun").onclick = async () => {
-    try { await runZImageTurbo(); }
-    catch (e) { addOutputItem({ title:"z-image-turbo 错误 / Error", meta:String(e) }); }
-  };
-  $("btnQwenRun").onclick = async () => {
-    try { await runQwenImage(); }
-    catch (e) { addOutputItem({ title:"Qwen-Image 错误 / Error", meta:String(e) }); }
-  };
-  $("btnQwen2512Run").onclick = async () => {
-    try { await runQwenImage2512(); }
-    catch (e) { addOutputItem({ title:"Qwen-Image-2512 错误 / Error", meta:String(e) }); }
-  };
   $("btnEditRun").onclick = async () => {
     try { await runEdit(); }
     catch (e) { addOutputItem({ title:"Edit-2511 错误 / Error", meta:String(e) }); }
@@ -1164,10 +1163,23 @@ function initUi() {
     try { await runWan(); }
     catch (e) { addOutputItem({ title:"Wan2.2 错误 / Error", meta:String(e) }); }
   };
-
   $("btnHyRun").onclick = async () => {
     try { await runHunyuanVideo(); }
     catch (e) { addOutputItem({ title:"HunyuanVideo 错误 / Error", meta:String(e) }); }
+  };
+
+  // New model buttons
+  $("btnZStdRun").onclick = async () => {
+    try { await runZImageStd(); }
+    catch (e) { addOutputItem({ title:"z-image (Standard) 错误 / Error", meta:String(e) }); }
+  };
+  $("btnQwen2512Run").onclick = async () => {
+    try { await runQwenImage2512(); }
+    catch (e) { addOutputItem({ title:"Qwen-Image-2512 错误 / Error", meta:String(e) }); }
+  };
+  $("btnQwenRun").onclick = async () => {
+    try { await runQwenImage(); }
+    catch (e) { addOutputItem({ title:"Qwen-Image 错误 / Error", meta:String(e) }); }
   };
 
   $("btnClearOutput").onclick = clearOutput;
