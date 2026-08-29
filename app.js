@@ -1,8 +1,7 @@
-// Moark Web (Cloudflare Pages/Workers)
-// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
-// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
+// ============================================================
+// 1. 常量 & 工具函数
+// ============================================================
 
-const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
 const $ = (id) => document.getElementById(id);
 
 // -------- 分辨率预设 --------
@@ -47,13 +46,15 @@ const QWEN2512_RESOLUTIONS = {
 const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
 
 const WAN_RES_PRESETS = {
-  "480p 横屏 / 832x480 (推荐 / Recommended)": [832, 480],
+  "480p 横屏 / 832x480 (推荐)": [832, 480],
   "480p 竖屏 / 480x832": [480, 832],
   "720p 横屏 / 1280x720": [1280, 720],
   "720p 竖屏 / 720x1280": [720, 1280],
   "1024 方图 / 1024x1024": [1024, 1024],
-  "2048 方图 / 2048x2048 (高成本 / Expensive)": [2048, 2048],
+  "2048 方图 / 2048x2048 (高成本)": [2048, 2048],
 };
+
+const WAN_SEGMENT_DURATION = 5.0; // 单段时长（秒）
 
 // -------- 工具函数 --------
 function nowTs() {
@@ -65,13 +66,11 @@ function nowTs() {
 function setStatus(text, kind="info") {
   const badge = $("statusBadge");
   if (!badge) return;
-
   badge.textContent = text;
   badge.style.borderColor =
     kind === "ok" ? "rgba(37,194,160,.7)" :
     kind === "err" ? "rgba(255,84,112,.75)" :
     "rgba(255,255,255,.10)";
-
   badge.style.background =
     kind === "ok" ? "rgba(37,194,160,.10)" :
     kind === "err" ? "rgba(255,84,112,.10)" :
@@ -81,12 +80,12 @@ function setStatus(text, kind="info") {
 function waitingStatusText(label, tick, elapsedMs, extra="") {
   const sec = Math.floor(elapsedMs / 1000);
   const extraText = extra ? ` • ${extra}` : "";
-  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查${extraText} • 正常等待，并非卡死`;
+  return `${label} 轮询中... 已等待 ${sec}s • 第 ${tick} 次检查${extraText}`;
 }
 
 function getApiKey() {
   const key = $("apiKey").value.trim();
-  if (!key) throw new Error("请输入 API Key / Please enter API Key");
+  if (!key) throw new Error("API Key is required");
   return key;
 }
 
@@ -121,6 +120,83 @@ function showPanel(model) {
   $("panelHunyuan").style.display = model === "HunyuanVideo-1.5" ? "block" : "none";
 }
 
+// -------- 输出渲染与内存管理 --------
+const _registeredObjectUrls = [];
+
+function _registerObjectUrl(url) {
+  if (url && !_registeredObjectUrls.includes(url)) {
+    _registeredObjectUrls.push(url);
+  }
+  return url;
+}
+
+function _revokeAllObjectUrls() {
+  for (const url of _registeredObjectUrls) {
+    URL.revokeObjectURL(url);
+  }
+  _registeredObjectUrls.length = 0;
+}
+
+async function renderImageItems(responseJson, modelTitle, metaInfo = {}) {
+  const data = Array.isArray(responseJson?.data) ? responseJson.data : [];
+  if (!data.length) {
+    addOutputItem({
+      title: `${modelTitle} 返回空数据`,
+      rawJson: responseJson,
+    });
+    setStatus(`${modelTitle} 失败`, "err");
+    return false;
+  }
+
+  let hasSuccess = false;
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i] || {};
+    let blobInfo = null;
+
+    try {
+      if (item.url) {
+        blobInfo = await fetchAsBlob(item.url, "image");
+      } else if (item.b64_json) {
+        const byteChars = atob(item.b64_json);
+        const bytes = new Uint8Array(byteChars.length);
+        for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
+        const blob = new Blob([bytes], { type: "image/png" });
+        blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
+      }
+
+      if (blobInfo) {
+        _registerObjectUrl(blobInfo.objUrl);
+        const img = document.createElement("img");
+        img.src = blobInfo.objUrl;
+        const filename = `${modelTitle.replace(/\s/g, '-')}-${nowTs()}-${i+1}.png`;
+
+        addOutputItem({
+          title: `${modelTitle} 输出 #${i+1}`,
+          meta: `size=${metaInfo.size || 'N/A'}, seed=${metaInfo.seed || 'random'}, n=${metaInfo.n || 1}`,
+          element: img,
+          download: { href: blobInfo.objUrl, filename },
+        });
+        hasSuccess = true;
+      } else {
+        addOutputItem({ title: `${modelTitle} 第${i+1}张无有效数据`, rawJson: item });
+      }
+    } catch (err) {
+      addOutputItem({
+        title: `${modelTitle} 第${i+1}张处理失败`,
+        meta: String(err),
+        rawJson: item,
+      });
+    }
+  }
+
+  if (hasSuccess) {
+    setStatus(`${modelTitle} 成功`, "ok");
+  } else {
+    setStatus(`${modelTitle} 部分失败`, "err");
+  }
+  return hasSuccess;
+}
+
 function addOutputItem({title, kind="info", meta="", element=null, rawJson=null, download=null, openUrl=null}) {
   const out = $("output");
   const box = document.createElement("div");
@@ -148,7 +224,7 @@ function addOutputItem({title, kind="info", meta="", element=null, rawJson=null,
     btns.className = "row";
     const b = document.createElement("button");
     b.className = "btn";
-    b.textContent = "下载 JSON / Download JSON";
+    b.textContent = "下载 JSON";
     b.onclick = () => downloadBlob(new Blob([pre.textContent], {type:"application/json"}), `${title}_${nowTs()}.json`);
     btns.appendChild(b);
     box.appendChild(btns);
@@ -157,7 +233,7 @@ function addOutputItem({title, kind="info", meta="", element=null, rawJson=null,
   if (download) {
     const btn = document.createElement("a");
     btn.className = "btn";
-    btn.textContent = "下载 / Download";
+    btn.textContent = "下载";
     btn.href = download.href;
     btn.download = download.filename || "";
     btn.target = "_blank";
@@ -194,10 +270,19 @@ function addOutputItem({title, kind="info", meta="", element=null, rawJson=null,
 }
 
 function clearOutput() {
-  $("output").innerHTML = "";
+  _revokeAllObjectUrls();
+  const out = $("output");
+  const media = out.querySelectorAll("img, video");
+  for (const el of media) {
+    if (el.src && el.src.startsWith("blob:")) {
+      URL.revokeObjectURL(el.src);
+    }
+  }
+  out.innerHTML = "";
+  setStatus("输出已清空");
 }
 
-// Same-origin proxy to ai.gitee.com/v1
+// -------- 网络请求 --------
 async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
   const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
     method,
@@ -208,7 +293,6 @@ async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}
   return res;
 }
 
-// Download proxy for arbitrary file_url/image urls to avoid CORS
 async function dlFetch(url, {signal=null}={}) {
   const u = `/dl?url=${encodeURIComponent(url)}`;
   const res = await fetch(u, {method:"GET", signal});
@@ -251,14 +335,14 @@ async function fetchAsBlob(url, kindHint="file") {
   const r = await dlFetch(url);
   if (!r.ok) {
     const j = await readJsonSafely(r);
-    throw new Error(`下载失败 / Download failed (${r.status}): ${JSON.stringify(j).slice(0, 240)}`);
+    throw new Error(`Download failed (${r.status}): ${JSON.stringify(j).slice(0, 240)}`);
   }
   const blob = await r.blob();
   const objUrl = URL.createObjectURL(blob);
   return { blob, objUrl };
 }
 
-// Poll task status
+// -------- 任务轮询 --------
 async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, onTick=null}={}) {
   const start = Date.now();
   let tick = 0;
@@ -268,10 +352,7 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
     const elapsedMs = Date.now() - start;
 
     if (onTick) {
-      onTick({
-        tick,
-        elapsedMs,
-      });
+      onTick({ tick, elapsedMs });
     }
 
     const res = await apiFetch(`task/${encodeURIComponent(taskId)}`, {
@@ -289,83 +370,47 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
   return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
 }
 
-// -------- z-image-turbo (原有) --------
+// ============================================================
+// 2. 各模型功能函数
+// ============================================================
+
+// -------- z-image-turbo (原有，已调整为使用 renderImageItems) --------
 async function runZImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
   const prompt = $("zPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+  if (!prompt) throw new Error("Prompt is required");
 
   const n = clampInt($("zN").value, 1, 4, 1);
   const [w, h] = Z_RESOLUTIONS[$("zRes").value];
   const size = `${w}x${h}`;
 
-  setStatus("z-image 生成中... / Generating...");
   const payload = { prompt, model: "z-image-turbo", n, size };
 
+  setStatus("z-image-turbo 生成中...");
   const res = await apiFetch("images/generations", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("z-image 失败 / Failed", "err");
-    addOutputItem({ title: "z-image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
-    throw new Error(`API 错误 / API Error (${res.status})`);
+    setStatus("z-image-turbo 失败", "err");
+    addOutputItem({ title: "z-image-turbo API 错误", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`API Error ${res.status}`);
   }
-
-  const data = Array.isArray(j.data) ? j.data : [];
-  if (!data.length) {
-    addOutputItem({ title: "z-image 返回无数据 / Empty response", rawJson: j });
-    setStatus("z-image 失败 / Failed", "err");
-    return;
-  }
-
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i] || {};
-    let blobInfo = null;
-
-    if (item.url) {
-      blobInfo = await fetchAsBlob(item.url, "image");
-    } else if (item.b64_json) {
-      const byteChars = atob(item.b64_json);
-      const bytes = new Uint8Array(byteChars.length);
-      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
-      const blob = new Blob([bytes], { type: "image/png" });
-      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
-    } else {
-      addOutputItem({ title: `z-image 第${i+1}张无数据 / No image data`, rawJson: item });
-      continue;
-    }
-
-    const img = document.createElement("img");
-    img.src = blobInfo.objUrl;
-
-    const filename = `z-image-${nowTs()}-${i+1}.png`;
-    addOutputItem({
-      title: `z-image 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
-      element: img,
-      download: { href: blobInfo.objUrl, filename },
-    });
-  }
-
-  setStatus("z-image 成功 / Success", "ok");
+  await renderImageItems(j, "z-image-turbo", { size, n });
 }
 
-// -------- Z-Image (新增) --------
+// -------- Z-Image (同步，修复 seed 为整数，去掉 extra_body) --------
 async function runZImageModel() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
   const prompt = $("ziPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+  if (!prompt) throw new Error("Prompt is required");
 
   const [w, h] = ZIMAGE_RESOLUTIONS[$("ziRes").value];
   const size = `${w}x${h}`;
@@ -373,96 +418,54 @@ async function runZImageModel() {
   const steps = clampInt($("ziSteps").value, 1, 100, 30);
   const numImages = clampInt($("ziNumImages").value, 1, 10, 1);
 
-  let seed = [];
+  let seedVal = 0;
   const seedRaw = $("ziSeed").value.trim();
   if (seedRaw) {
-    seed = seedRaw.split(",").map(s => parseInt(s.trim())).filter(n => Number.isFinite(n));
-    if (seed.length === 0) seed = [];
+    const parts = seedRaw.split(",").map(s => parseInt(s.trim())).filter(n => Number.isFinite(n));
+    if (parts.length > 0) seedVal = parts[0];
   }
 
   const negative = $("ziNeg").value.trim();
 
-  setStatus("Z-Image 生成中... / Generating...");
   const payload = {
     prompt,
     model: "Z-Image",
     size,
     n: numImages,
-    extra_body: {
-      guidance_scale: guidance,
-      num_inference_steps: steps,
-      seed: seed.length ? seed : [],
-      negative_prompt: negative,
-      width: 0,
-      height: 0,
-      lora_weights: [],
-      lora_scale: 0,
-      num_images_per_prompt: numImages,
-    },
+    guidance_scale: guidance,
+    num_inference_steps: steps,
+    seed: seedVal,
+    negative_prompt: negative,
+    width: 0,
+    height: 0,
+    lora_weights: [],
+    lora_scale: 0,
+    num_images_per_prompt: numImages,
   };
 
+  setStatus("Z-Image 生成中...");
   const res = await apiFetch("images/generations", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("Z-Image 失败 / Failed", "err");
-    addOutputItem({ title: "Z-Image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
-    throw new Error(`API 错误 / API Error (${res.status})`);
+    setStatus("Z-Image 失败", "err");
+    addOutputItem({ title: "Z-Image API 错误", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`API Error ${res.status}`);
   }
-
-  const data = Array.isArray(j.data) ? j.data : [];
-  if (!data.length) {
-    addOutputItem({ title: "Z-Image 返回无数据 / Empty response", rawJson: j });
-    setStatus("Z-Image 失败 / Failed", "err");
-    return;
-  }
-
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i] || {};
-    let blobInfo = null;
-
-    if (item.url) {
-      blobInfo = await fetchAsBlob(item.url, "image");
-    } else if (item.b64_json) {
-      const byteChars = atob(item.b64_json);
-      const bytes = new Uint8Array(byteChars.length);
-      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
-      const blob = new Blob([bytes], { type: "image/png" });
-      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
-    } else {
-      addOutputItem({ title: `Z-Image 第${i+1}张无数据 / No image data`, rawJson: item });
-      continue;
-    }
-
-    const img = document.createElement("img");
-    img.src = blobInfo.objUrl;
-
-    const filename = `Z-Image-${nowTs()}-${i+1}.png`;
-    addOutputItem({
-      title: `Z-Image 输出 #${i+1}`,
-      meta: `size=${size}, seed=${seed.join(",") || "random"}`,
-      element: img,
-      download: { href: blobInfo.objUrl, filename },
-    });
-  }
-
-  setStatus("Z-Image 成功 / Success", "ok");
+  await renderImageItems(j, "Z-Image", { size, seed: String(seedVal), n: numImages });
 }
 
-// -------- Qwen-Image (新增) --------
+// -------- Qwen-Image (异步，种子改为整数) --------
 async function runQwenImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
   const prompt = $("qiPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+  if (!prompt) throw new Error("Prompt is required");
 
   const [w, h] = QWEN_RESOLUTIONS[$("qiRes").value];
   const size = `${w}x${h}`;
@@ -470,177 +473,129 @@ async function runQwenImage() {
   const cfg = clampFloat($("qiCfg").value, 0, 20, 1);
   const numImages = clampInt($("qiNumImages").value, 1, 10, 1);
 
-  let seed = [];
+  let seedVal = 0;
   const seedRaw = $("qiSeed").value.trim();
   if (seedRaw) {
-    seed = seedRaw.split(",").map(s => parseInt(s.trim())).filter(n => Number.isFinite(n));
-    if (seed.length === 0) seed = [];
+    const parts = seedRaw.split(",").map(s => parseInt(s.trim())).filter(n => Number.isFinite(n));
+    if (parts.length > 0) seedVal = parts[0];
   }
 
   const negative = $("qiNeg").value.trim();
 
-  setStatus("Qwen-Image 生成中... / Generating...");
   const payload = {
     prompt,
     model: "Qwen-Image",
     size,
-    n: numImages,
-    extra_body: {
-      num_inference_steps: steps,
-      cfg_scale: cfg,
-      seed: seed.length ? seed : [],
-      negative_prompt: negative,
-      width: 0,
-      height: 0,
-      num_images_per_prompt: numImages,
-      lora_weights: [],
-    },
+    num_images_per_prompt: numImages,
+    width: 0,
+    height: 0,
+    num_inference_steps: steps,
+    cfg_scale: cfg,
+    seed: seedVal,
+    negative_prompt: negative,
+    lora_weights: [],
   };
 
-  const res = await apiFetch("images/generations", {
+  setStatus("Qwen-Image 创建异步任务...");
+  const res = await apiFetch("async/images/generations", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
-  if (!res.ok) {
-    setStatus("Qwen-Image 失败 / Failed", "err");
-    addOutputItem({ title: "Qwen-Image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
-    throw new Error(`API 错误 / API Error (${res.status})`);
+  if (!res.ok || !j.task_id) {
+    setStatus("Qwen-Image 创建任务失败", "err");
+    addOutputItem({ title: "Qwen-Image 异步创建失败", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`Create failed ${res.status}`);
   }
 
-  const data = Array.isArray(j.data) ? j.data : [];
-  if (!data.length) {
-    addOutputItem({ title: "Qwen-Image 返回无数据 / Empty response", rawJson: j });
-    setStatus("Qwen-Image 失败 / Failed", "err");
+  const taskId = j.task_id;
+  addOutputItem({ title: "Qwen-Image 任务已创建", meta: `task_id=${taskId}`, rawJson: j });
+
+  const result = await pollTask(taskId, apiKey, {
+    timeoutMs: 10 * 60 * 1000,
+    intervalMs: 3000,
+    onTick: (info) => {
+      setStatus(waitingStatusText(`Qwen-Image (${taskId.slice(0,8)})`, info.tick, info.elapsedMs));
+    },
+  });
+
+  if (result.status !== "success") {
+    setStatus(`Qwen-Image ${result.status}`, "err");
+    addOutputItem({ title: `Qwen-Image 任务结束：${result.status}`, rawJson: result.raw });
     return;
   }
 
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i] || {};
-    let blobInfo = null;
-
-    if (item.url) {
-      blobInfo = await fetchAsBlob(item.url, "image");
-    } else if (item.b64_json) {
-      const byteChars = atob(item.b64_json);
-      const bytes = new Uint8Array(byteChars.length);
-      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
-      const blob = new Blob([bytes], { type: "image/png" });
-      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
-    } else {
-      addOutputItem({ title: `Qwen-Image 第${i+1}张无数据 / No image data`, rawJson: item });
-      continue;
-    }
-
-    const img = document.createElement("img");
-    img.src = blobInfo.objUrl;
-
-    const filename = `Qwen-Image-${nowTs()}-${i+1}.png`;
-    addOutputItem({
-      title: `Qwen-Image 输出 #${i+1}`,
-      meta: `size=${size}, seed=${seed.join(",") || "random"}`,
-      element: img,
-      download: { href: blobInfo.objUrl, filename },
-    });
+  const fileUrl = result.raw?.output?.file_url;
+  if (!fileUrl) {
+    setStatus("Qwen-Image 无输出文件", "err");
+    addOutputItem({ title: "Qwen-Image 成功但无 file_url", rawJson: result.raw });
+    return;
   }
 
-  setStatus("Qwen-Image 成功 / Success", "ok");
+  setStatus("Qwen-Image 下载中...");
+  const blobInfo = await fetchAsBlob(fileUrl, "image");
+  const img = document.createElement("img");
+  img.src = blobInfo.objUrl;
+  addOutputItem({
+    title: "Qwen-Image 异步输出",
+    meta: `task_id=${taskId} • size=${size} • seed=${seedVal}`,
+    element: img,
+    download: { href: blobInfo.objUrl, filename: `Qwen-Image-${nowTs()}.png` },
+    openUrl: fileUrl,
+  });
+  setStatus("Qwen-Image 成功", "ok");
 }
 
-// -------- Qwen-Image-2512 (新增) --------
+// -------- Qwen-Image-2512 (同步，种子整数，去掉 extra_body) --------
 async function runQwenImage2512() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
   const prompt = $("q2Prompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+  if (!prompt) throw new Error("Prompt is required");
 
   const [w, h] = QWEN2512_RESOLUTIONS[$("q2Res").value];
   const size = `${w}x${h}`;
   const steps = clampInt($("q2Steps").value, 1, 50, 4);
   const cfg = clampFloat($("q2Cfg").value, 0, 20, 1);
-  const seed = clampInt($("q2Seed").value, -1, 2147483647, 0);
+  let seedVal = clampInt($("q2Seed").value, -1, 2147483647, 0);
+  if (seedVal < 0) seedVal = 0;
   const negative = $("q2Neg").value.trim();
 
-  setStatus("Qwen-Image-2512 生成中... / Generating...");
   const payload = {
     prompt,
     model: "Qwen-Image-2512",
     size,
     n: 1,
-    extra_body: {
-      num_inference_steps: steps,
-      cfg_scale: cfg,
-      seed: seed < 0 ? 0 : seed,
-      negative_prompt: negative,
-      width: 0,
-      height: 0,
-      lora_weights: [],
-      lora_scale: 0,
-    },
+    num_inference_steps: steps,
+    cfg_scale: cfg,
+    seed: seedVal,
+    negative_prompt: negative,
+    width: 0,
+    height: 0,
+    lora_weights: [],
+    lora_scale: 0,
   };
 
+  setStatus("Qwen-Image-2512 生成中...");
   const res = await apiFetch("images/generations", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("Qwen-Image-2512 失败 / Failed", "err");
-    addOutputItem({ title: "Qwen-Image-2512 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
-    throw new Error(`API 错误 / API Error (${res.status})`);
+    setStatus("Qwen-Image-2512 失败", "err");
+    addOutputItem({ title: "Qwen-Image-2512 API 错误", rawJson: j, meta: `HTTP ${res.status}` });
+    throw new Error(`API Error ${res.status}`);
   }
-
-  const data = Array.isArray(j.data) ? j.data : [];
-  if (!data.length) {
-    addOutputItem({ title: "Qwen-Image-2512 返回无数据 / Empty response", rawJson: j });
-    setStatus("Qwen-Image-2512 失败 / Failed", "err");
-    return;
-  }
-
-  for (let i = 0; i < data.length; i++) {
-    const item = data[i] || {};
-    let blobInfo = null;
-
-    if (item.url) {
-      blobInfo = await fetchAsBlob(item.url, "image");
-    } else if (item.b64_json) {
-      const byteChars = atob(item.b64_json);
-      const bytes = new Uint8Array(byteChars.length);
-      for (let k = 0; k < byteChars.length; k++) bytes[k] = byteChars.charCodeAt(k);
-      const blob = new Blob([bytes], { type: "image/png" });
-      blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
-    } else {
-      addOutputItem({ title: `Qwen-Image-2512 第${i+1}张无数据 / No image data`, rawJson: item });
-      continue;
-    }
-
-    const img = document.createElement("img");
-    img.src = blobInfo.objUrl;
-
-    const filename = `Qwen-Image-2512-${nowTs()}-${i+1}.png`;
-    addOutputItem({
-      title: `Qwen-Image-2512 输出 #${i+1}`,
-      meta: `size=${size}, seed=${seed}`,
-      element: img,
-      download: { href: blobInfo.objUrl, filename },
-    });
-  }
-
-  setStatus("Qwen-Image-2512 成功 / Success", "ok");
+  await renderImageItems(j, "Qwen-Image-2512", { size, seed: String(seedVal), n: 1 });
 }
 
-// -------- Edit-2511 (原有) --------
+// -------- Edit-2511 (不变) --------
 async function runEdit() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -648,10 +603,10 @@ async function runEdit() {
   const f1 = $("editImg1").files?.[0];
   const f2 = $("editImg2").files?.[0];
   const prompt = $("editPrompt").value.trim();
-  if (!f1 || !f2 || !prompt) throw new Error("请上传2张图片并输入提示词 / Please provide 2 images and prompt");
+  if (!f1 || !f2 || !prompt) throw new Error("请上传2张图片并输入提示词");
 
   const taskTypes = Array.from(document.querySelectorAll("input[name='editTaskType']:checked")).map(x => x.value);
-  if (!taskTypes.length) throw new Error("至少选择一个 task_types / Choose at least one task type");
+  if (!taskTypes.length) throw new Error("至少选择一个 task_types");
 
   const steps = clampInt($("editSteps").value, 1, 50, 4);
   const guidance = clampFloat($("editGuidance").value, 0, 10, 1.0);
@@ -665,7 +620,7 @@ async function runEdit() {
   fd.append("image", f1, f1.name);
   fd.append("image", f2, f2.name);
 
-  setStatus("Edit-2511 创建任务中... / Creating task...");
+  setStatus("Edit-2511 创建任务中...");
   const res = await apiFetch("async/images/edits", {
     method: "POST",
     headers: { "Authorization": `Bearer ${apiKey}` },
@@ -674,45 +629,33 @@ async function runEdit() {
 
   const j = await readJsonSafely(res);
   if (!res.ok || !j.task_id) {
-    setStatus("Edit-2511 创建失败 / Create failed", "err");
-    addOutputItem({
-      title: "Edit-2511 创建任务失败 / Create failed",
-      meta: `HTTP ${res.status}`,
-      rawJson: j,
-    });
-    throw new Error("创建任务失败 / Create failed");
+    setStatus("Edit-2511 创建失败", "err");
+    addOutputItem({ title: "Edit-2511 创建任务失败", meta: `HTTP ${res.status}`, rawJson: j });
+    throw new Error("Create failed");
   }
 
   const taskId = j.task_id;
-  setStatus(`Edit-2511 任务已创建，开始轮询... (${taskId.slice(0,8)})`);
+  setStatus(`Edit-2511 任务已创建 (${taskId.slice(0,8)})`);
 
   const result = await pollTask(taskId, apiKey, {
     intervalMs: 6000,
     onTick: (info) => {
-      setStatus(
-        waitingStatusText(
-          "Edit-2511",
-          info.tick,
-          info.elapsedMs,
-          `task=${taskId.slice(0,8)}`
-        )
-      );
+      setStatus(waitingStatusText("Edit-2511", info.tick, info.elapsedMs, `task=${taskId.slice(0,8)}`));
     },
   });
 
-  addOutputItem({ title: `Edit-2511 任务结果 task=${taskId.slice(0,8)}`, rawJson: result.raw });
+  addOutputItem({ title: `Edit-2511 任务结果`, rawJson: result.raw });
 
   if (result.status !== "success") {
-    setStatus("Edit-2511 失败 / Failed", "err");
-    throw new Error(`任务失败 / Task failed: ${result.status}`);
+    setStatus("Edit-2511 失败", "err");
+    throw new Error(`Task failed: ${result.status}`);
   }
 
   const fileUrl = result.raw?.output?.file_url;
-  if (!fileUrl) throw new Error("success 但没有 file_url / no file_url");
+  if (!fileUrl) throw new Error("No file_url");
 
-  setStatus("Edit-2511 下载中... / Downloading...");
+  setStatus("Edit-2511 下载中...");
   const { objUrl } = await fetchAsBlob(fileUrl, "image");
-
   const img = document.createElement("img");
   img.src = objUrl;
 
@@ -724,10 +667,10 @@ async function runEdit() {
     openUrl: $("editOpenUrl").checked ? fileUrl : null,
   });
 
-  setStatus("Edit-2511 成功 / Success", "ok");
+  setStatus("Edit-2511 成功", "ok");
 }
 
-// -------- Wan2.2 (原有) --------
+// -------- Wan2.2 (原有，仅将硬编码替换为常量) --------
 function applyWanResolution() {
   const key = $("wanResPreset").value;
   const [w, h] = WAN_RES_PRESETS[key];
@@ -737,18 +680,13 @@ function applyWanResolution() {
 
 function applyWanPreset() {
   const p = $("wanPreset").value;
-  let steps = 30;
-  let guidance = 5.0;
-  let fps = 24;
-
+  let steps = 30, guidance = 5.0, fps = 24;
   if (p.includes("更清晰")) { steps = 60; guidance = 6.0; }
   else if (p.includes("更动感")) { steps = 40; guidance = 5.0; fps = 30; }
   else if (p.includes("更快")) { steps = 20; guidance = 4.0; }
-
   $("wanSteps").value = String(steps);
   $("wanGuidance").value = String(guidance);
   $("wanFps").value = String(fps);
-
   if ($("wanAutoFrames").checked) {
     $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
   }
@@ -804,7 +742,7 @@ async function ensureJsZip() {
   document.head.appendChild(script);
   await new Promise((resolve, reject) => {
     script.onload = resolve;
-    script.onerror = () => reject(new Error("加载 JSZip 失败 / Failed to load JSZip"));
+    script.onerror = () => reject(new Error("Failed to load JSZip"));
   });
   return window.JSZip;
 }
@@ -824,10 +762,10 @@ async function runWan() {
   rememberKeyMaybe();
 
   const img = $("wanImg").files?.[0];
-  if (!img) throw new Error("请选择有效图片 / Please select a valid image");
+  if (!img) throw new Error("请选择有效图片");
 
   const prompt = $("wanPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+  if (!prompt) throw new Error("请输入提示词");
 
   const neg = $("wanNeg").value.trim();
 
@@ -853,13 +791,11 @@ async function runWan() {
   const watermark = $("wanWatermark").checked;
   const promptExtend = $("wanPromptExtend").checked;
 
-  const segmentLen = 5.0;
-  const segCount = Math.max(1, Math.ceil(duration / segmentLen));
-
+  const segCount = Math.max(1, Math.ceil(duration / WAN_SEGMENT_DURATION));
   const segments = [];
 
   for (let i = 0; i < segCount; i++) {
-    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 创建中... / Segment ${i+1}/${segCount} creating...`);
+    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 创建中...`);
 
     const create = await createWanTask(apiKey, {
       imageFile: img,
@@ -877,47 +813,39 @@ async function runWan() {
     });
 
     if (!create.ok) {
-      setStatus("Wan2.2 创建失败 / Create failed", "err");
+      setStatus("Wan2.2 创建失败", "err");
       addOutputItem({
         title: `Wan2.2 创建任务失败（分段 ${i+1}）`,
         meta: `tried=${create.tried}, HTTP ${create.res.status}`,
         rawJson: create.json,
       });
-      throw new Error("创建任务失败 / Create failed");
+      throw new Error("Create failed");
     }
 
     const taskId = create.json.task_id;
-    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 任务已创建，开始轮询... (${taskId.slice(0,8)})`);
+    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 轮询中...`);
 
     const result = await pollTask(taskId, apiKey, {
       timeoutMs: 60*60*1000,
       intervalMs: 8000,
       onTick: (info) => {
-        setStatus(
-          waitingStatusText(
-            `Wan2.2 分段 ${i+1}/${segCount}`,
-            info.tick,
-            info.elapsedMs,
-            `task=${taskId.slice(0,8)}`
-          )
-        );
+        setStatus(waitingStatusText(`Wan2.2 分段 ${i+1}/${segCount}`, info.tick, info.elapsedMs, `task=${taskId.slice(0,8)}`));
       },
     });
 
-    addOutputItem({ title: `Wan2.2 分段 ${i+1} 任务结果`, rawJson: result.raw, meta: `task_id=${taskId}` });
+    addOutputItem({ title: `Wan2.2 分段 ${i+1} 任务结果`, rawJson: result.raw });
 
     if (result.status !== "success") {
-      setStatus("Wan2.2 失败 / Failed", "err");
-      throw new Error(`任务失败 / Task failed: ${result.status}`);
+      setStatus("Wan2.2 失败", "err");
+      throw new Error(`Task failed: ${result.status}`);
     }
 
     const fileUrl = result.raw?.output?.file_url;
-    if (!fileUrl) throw new Error("success 但没有 file_url / no file_url");
+    if (!fileUrl) throw new Error("No file_url");
 
-    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 下载中... / Downloading...`);
+    setStatus(`Wan2.2 分段 ${i+1}/${segCount} 下载中...`);
     const dl = await fetchAsBlob(fileUrl, "video");
     const name = `wan_seg${i+1}_${nowTs()}.mp4`;
-
     segments.push({ name, blob: dl.blob, objUrl: dl.objUrl, fileUrl, taskId });
 
     const video = document.createElement("video");
@@ -935,38 +863,31 @@ async function runWan() {
 
   if (segCount > 1 && $("wanZipSegments").checked) {
     try {
-      setStatus("Wan2.2 打包 zip 中... / Zipping...");
+      setStatus("Wan2.2 打包 zip 中...");
       await zipAndDownloadMp4s(segments, `wan_segments_${nowTs()}.zip`);
-      setStatus("Wan2.2 成功 / Success", "ok");
+      setStatus("Wan2.2 成功", "ok");
     } catch (e) {
-      addOutputItem({ title: "Wan2.2 zip 打包失败 / Zip failed", meta: String(e) });
-      setStatus("Wan2.2 成功（但 zip 失败）/ Success (zip failed)", "ok");
+      addOutputItem({ title: "Wan2.2 zip 打包失败", meta: String(e) });
+      setStatus("Wan2.2 成功（但 zip 失败）", "ok");
     }
   } else {
-    setStatus("Wan2.2 成功 / Success", "ok");
+    setStatus("Wan2.2 成功", "ok");
   }
 }
 
-// -------- HunyuanVideo (原有) --------
+// -------- HunyuanVideo (不变) --------
 async function runHunyuanVideo() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
 
   const prompt = $("hyPrompt").value.trim();
-  if (!prompt) throw new Error("请输入提示词 / Please input prompt");
+  if (!prompt) throw new Error("Prompt is required");
 
   const negative_prompt = $("hyNeg").value.trim();
-
   const aspect_ratio = $("hyAspect").value;
   const num_inferenece_steps = clampInt($("hySteps").value, 1, 10, 10);
   const num_frames = clampInt($("hyFrames").value, 81, 241, 241);
-
-  const seedRaw = $("hySeed").value;
-  const seed = Number.parseInt(String(seedRaw), 10);
-  if (!Number.isFinite(seed) || seed <= 0) {
-    throw new Error("seed 必须是正整数 / seed must be a positive integer");
-  }
-
+  const seed = clampInt($("hySeed").value, 1, 2147483647, 1);
   const fps = clampInt($("hyFps").value, 1, 24, 24);
   const openAfter = $("hyOpenUrl").checked;
 
@@ -981,45 +902,35 @@ async function runHunyuanVideo() {
     fps,
   };
 
-  setStatus("HunyuanVideo 创建任务... / Creating task...");
+  setStatus("HunyuanVideo 创建任务...");
   const res = await apiFetch("async/videos/generations", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("HunyuanVideo 失败 / Failed", "err");
-    addOutputItem({
-      title: "HunyuanVideo 创建任务失败 / Create task failed",
-      meta: `HTTP ${res.status}`,
-      rawJson: j,
-    });
-    throw new Error(`API 错误 / API Error (${res.status})`);
+    setStatus("HunyuanVideo 失败", "err");
+    addOutputItem({ title: "HunyuanVideo 创建失败", meta: `HTTP ${res.status}`, rawJson: j });
+    throw new Error(`API Error ${res.status}`);
   }
 
   const taskId = j.task_id;
   if (!taskId) {
-    setStatus("HunyuanVideo 失败 / Failed", "err");
-    addOutputItem({
-      title: "HunyuanVideo 未返回 task_id / Missing task_id",
-      rawJson: j,
-    });
-    throw new Error("Task ID not found in response");
+    setStatus("HunyuanVideo 失败", "err");
+    addOutputItem({ title: "HunyuanVideo 未返回 task_id", rawJson: j });
+    throw new Error("No task_id");
   }
 
   addOutputItem({
-    title: "HunyuanVideo 任务已创建 / Task created",
-    meta: `task_id=${taskId} • aspect_ratio=${aspect_ratio} • frames=${num_frames} • fps=${fps} • steps=${num_inferenece_steps} • seed=${seed}`,
+    title: "HunyuanVideo 任务已创建",
+    meta: `task_id=${taskId}`,
     rawJson: j,
     openUrl: openAfter ? `https://ai.gitee.com/v1/task/${encodeURIComponent(taskId)}` : null,
   });
 
-  setStatus("HunyuanVideo 任务已创建，开始轮询...");
+  setStatus("HunyuanVideo 开始轮询...");
   const result = await pollTask(taskId, apiKey, {
     intervalMs: 10 * 1000,
     timeoutMs: 30 * 60 * 1000,
@@ -1028,22 +939,13 @@ async function runHunyuanVideo() {
     },
   });
 
-  const st = result.status;
-  const raw = result.raw || {};
-
-  if (st !== "success") {
-    setStatus(`HunyuanVideo ${st} / ${st}`, st === "failed" ? "err" : "info");
-    addOutputItem({
-      title: `HunyuanVideo 任务结束：${st} / Task ended: ${st}`,
-      rawJson: raw,
-      meta: `task_id=${taskId}`,
-    });
+  if (result.status !== "success") {
+    setStatus(`HunyuanVideo ${result.status}`, "err");
+    addOutputItem({ title: `HunyuanVideo 任务结束：${result.status}`, rawJson: result.raw });
     return;
   }
 
-  const fileUrl = raw?.output?.file_url;
-  const textRes = raw?.output?.text_result;
-
+  const fileUrl = result.raw?.output?.file_url;
   if (fileUrl) {
     const blobInfo = await fetchAsBlob(fileUrl, "video");
     const video = document.createElement("video");
@@ -1052,152 +954,126 @@ async function runHunyuanVideo() {
     video.playsInline = true;
 
     addOutputItem({
-      title: "HunyuanVideo 输出 / Output",
-      meta: `task_id=${taskId} • file_url=${fileUrl}`,
+      title: "HunyuanVideo 输出",
+      meta: `task_id=${taskId}`,
       element: video,
-      rawJson: raw,
       download: { href: blobInfo.objUrl, filename: `hunyuan-video-${nowTs()}.mp4` },
       openUrl: openAfter ? fileUrl : null,
     });
-
-    setStatus("HunyuanVideo 成功 / Success", "ok");
-  } else if (textRes) {
-    addOutputItem({
-      title: "HunyuanVideo 文本输出 / Text output",
-      meta: `task_id=${taskId}`,
-      rawJson: raw,
-    });
-    setStatus("HunyuanVideo 成功 / Success", "ok");
+    setStatus("HunyuanVideo 成功", "ok");
   } else {
-    addOutputItem({
-      title: "HunyuanVideo 成功但无输出 / Success but no output",
-      meta: `task_id=${taskId}`,
-      rawJson: raw,
-    });
-    setStatus("HunyuanVideo 成功 / Success", "ok");
+    addOutputItem({ title: "HunyuanVideo 成功但无视频文件", rawJson: result.raw });
+    setStatus("HunyuanVideo 成功", "ok");
   }
 }
 
-// -------- 初始化 UI --------
+// ============================================================
+// 3. 初始化 UI
+// ============================================================
+
 function initUi() {
-  // 填充 z-image-turbo 分辨率
-  const zRes = $("zRes");
-  for (const k of Object.keys(Z_RESOLUTIONS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    zRes.appendChild(o);
-  }
-  zRes.value = Object.keys(Z_RESOLUTIONS)[0];
+  // 填充所有分辨率下拉框
+  const fillSelect = (id, map, defaultKey) => {
+    const sel = $(id);
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (const k of Object.keys(map)) {
+      const o = document.createElement('option');
+      o.value = k;
+      o.textContent = k;
+      sel.appendChild(o);
+    }
+    if (defaultKey && map[defaultKey]) sel.value = defaultKey;
+    else sel.value = Object.keys(map)[0];
+  };
 
-  // 填充 Z-Image 分辨率
-  const ziRes = $("ziRes");
-  for (const k of Object.keys(ZIMAGE_RESOLUTIONS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    ziRes.appendChild(o);
-  }
-  ziRes.value = Object.keys(ZIMAGE_RESOLUTIONS)[0];
-
-  // 填充 Qwen-Image 分辨率
-  const qiRes = $("qiRes");
-  for (const k of Object.keys(QWEN_RESOLUTIONS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    qiRes.appendChild(o);
-  }
-  qiRes.value = Object.keys(QWEN_RESOLUTIONS)[0];
-
-  // 填充 Qwen-Image-2512 分辨率
-  const q2Res = $("q2Res");
-  for (const k of Object.keys(QWEN2512_RESOLUTIONS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
-    q2Res.appendChild(o);
-  }
-  q2Res.value = Object.keys(QWEN2512_RESOLUTIONS)[0];
+  fillSelect('zRes', Z_RESOLUTIONS, '1:1 (2048x2048)');
+  fillSelect('ziRes', ZIMAGE_RESOLUTIONS, '1:1 (1024x1024)');
+  fillSelect('qiRes', QWEN_RESOLUTIONS, '1:1 (2048x2048)');
+  fillSelect('q2Res', QWEN2512_RESOLUTIONS, '9:16 (1152x2048)');
 
   // Wan 分辨率预设
-  const wanRes = $("wanResPreset");
+  const wanRes = $('wanResPreset');
   for (const k of Object.keys(WAN_RES_PRESETS)) {
-    const o = document.createElement("option");
-    o.value = k; o.textContent = k;
+    const o = document.createElement('option');
+    o.value = k;
+    o.textContent = k;
     wanRes.appendChild(o);
   }
   wanRes.value = Object.keys(WAN_RES_PRESETS)[0];
   applyWanResolution();
 
-  // Edit 任务类型复选框
-  const box = $("editTaskTypes");
+  // Edit 任务类型
+  const box = $('editTaskTypes');
   for (const t of EDIT_TASK_TYPES) {
-    const label = document.createElement("label");
-    label.className = "chk";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.name = "editTaskType";
+    const label = document.createElement('label');
+    label.className = 'chk';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'editTaskType';
     input.value = t;
-    input.checked = (t === "id" || t === "style");
+    input.checked = (t === 'id' || t === 'style');
     label.appendChild(input);
-    label.appendChild(document.createTextNode(" " + t));
+    label.appendChild(document.createTextNode(' ' + t));
     box.appendChild(label);
   }
 
   // 模型切换
-  $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
-  showPanel($("modelSel").value);
+  $('modelSel').addEventListener('change', (e) => showPanel(e.target.value));
+  showPanel($('modelSel').value);
 
-  // 按钮绑定
-  $("btnZRun").onclick = async () => {
+  // 按钮事件
+  $('btnZRun').onclick = async () => {
     try { await runZImage(); }
-    catch (e) { addOutputItem({ title:"z-image 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'z-image-turbo 错误', meta: String(e) }); }
   };
-  $("btnZiRun").onclick = async () => {
+  $('btnZiRun').onclick = async () => {
     try { await runZImageModel(); }
-    catch (e) { addOutputItem({ title:"Z-Image 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'Z-Image 错误', meta: String(e) }); }
   };
-  $("btnQiRun").onclick = async () => {
+  $('btnQiRun').onclick = async () => {
     try { await runQwenImage(); }
-    catch (e) { addOutputItem({ title:"Qwen-Image 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'Qwen-Image 错误', meta: String(e) }); }
   };
-  $("btnQ2Run").onclick = async () => {
+  $('btnQ2Run').onclick = async () => {
     try { await runQwenImage2512(); }
-    catch (e) { addOutputItem({ title:"Qwen-Image-2512 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'Qwen-Image-2512 错误', meta: String(e) }); }
   };
-  $("btnEditRun").onclick = async () => {
+  $('btnEditRun').onclick = async () => {
     try { await runEdit(); }
-    catch (e) { addOutputItem({ title:"Edit-2511 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'Edit-2511 错误', meta: String(e) }); }
   };
-  $("btnWanRun").onclick = async () => {
+  $('btnWanRun').onclick = async () => {
     try { await runWan(); }
-    catch (e) { addOutputItem({ title:"Wan2.2 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'Wan2.2 错误', meta: String(e) }); }
   };
-  $("btnHyRun").onclick = async () => {
+  $('btnHyRun').onclick = async () => {
     try { await runHunyuanVideo(); }
-    catch (e) { addOutputItem({ title:"HunyuanVideo 错误 / Error", meta:String(e) }); }
+    catch (e) { addOutputItem({ title: 'HunyuanVideo 错误', meta: String(e) }); }
   };
 
-  $("btnClearOutput").onclick = clearOutput;
+  $('btnClearOutput').onclick = clearOutput;
+  $('btnClearKey').onclick = clearRememberedKey;
 
-  $("btnWanApplyPreset").onclick = applyWanPreset;
-  $("wanResPreset").addEventListener("change", applyWanResolution);
-  $("wanAutoFrames").addEventListener("change", () => {
-    if ($("wanAutoFrames").checked) {
-      const fps = clampInt($("wanFps").value, 1, 60, 24);
-      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
+  $('btnWanApplyPreset').onclick = applyWanPreset;
+  $('wanResPreset').addEventListener('change', applyWanResolution);
+  $('wanAutoFrames').addEventListener('change', () => {
+    if ($('wanAutoFrames').checked) {
+      const fps = clampInt($('wanFps').value, 1, 60, 24);
+      $('wanFrames').value = String(Math.max(1, Math.min(300, fps * 5)));
     }
   });
-  $("wanFps").addEventListener("change", () => {
-    if ($("wanAutoFrames").checked) {
-      const fps = clampInt($("wanFps").value, 1, 60, 24);
-      $("wanFrames").value = String(Math.max(1, Math.min(300, fps * 5)));
+  $('wanFps').addEventListener('change', () => {
+    if ($('wanAutoFrames').checked) {
+      const fps = clampInt($('wanFps').value, 1, 60, 24);
+      $('wanFrames').value = String(Math.max(1, Math.min(300, fps * 5)));
     }
   });
-
-  $("btnClearKey").onclick = clearRememberedKey;
 
   loadRememberedKey();
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener('DOMContentLoaded', () => {
   initUi();
-  setStatus("准备就绪 / Ready");
+  setStatus('准备就绪 / Ready');
 });
