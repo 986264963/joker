@@ -89,10 +89,10 @@
       <h2>2. 选择模型 / Select Model</h2>
       <div class="row">
         <select id="modelSel" class="input">
-          <option value="Qwen-Image">Qwen-Image（文生图 / Text-to-Image）</option>
+          <option value="z-image">z-image（文生图 / Text-to-Image）</option>
           <option value="z-image-turbo">z-image-turbo（文生图 / Text-to-Image）</option>
+          <option value="Qwen-Image">Qwen-Image（文生图 / Text-to-Image）</option>
           <option value="Qwen-Image-2512">Qwen-Image-2512（文生图 / Text-to-Image）</option>
-          <option value="Z-Image">Z-Image（文生图 / Text-to-Image）</option>
           <option value="Edit-2511">Edit-2511（图像编辑 / Image Edit）</option>
           <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B（图生视频 / Image-to-Video）</option>
           <option value="HunyuanVideo-1.5">HunyuanVideo-1.5（文生视频 / Text-to-Video）</option>
@@ -100,167 +100,149 @@
       </div>
     </section>
 
-    <!-- Model 1: Qwen-Image -->
-    <section class="card model-panel" id="panelQwenImage">
-      <h2>Qwen-Image（文生图）</h2>
-      <label class="lab">提示词 Prompt（中/英均可）</label>
-      <textarea id="qiPrompt" class="textarea" rows="6" placeholder="例如：一幅精致细腻的工笔画，画面中心是一株蓬勃生长的红色牡丹..."></textarea>
+    <section class="card model-panel" id="panelZ">
+      <h2>z-image（文生图 / Text-to-Image）</h2>
+
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="zPrompt" class="textarea" rows="6" placeholder="例如：一只戴墨镜的柴犬，赛博朋克风，超清"></textarea>
+
       <div class="grid2">
         <div>
           <label class="lab">分辨率 Resolution</label>
-          <select id="qiRes" class="input">
-            <option value="2048*2048">1:1 (2048*2048)</option>
-            <option value="2048*1536">4:3 (2048*1536)</option>
-            <option value="1536*2048">3:4 (1536*2048)</option>
-            <option value="2048*1360">3:2 (2048*1360)</option>
-            <option value="1360*2048">2:3 (1360*2048)</option>
-            <option value="2048*1152">16:9 (2048*1152)</option>
-            <option value="1152*2048">9:16 (1152*2048)</option>
-          </select>
+          <select id="zRes" class="input"></select>
         </div>
         <div>
           <label class="lab">张数 n（1-4）</label>
-          <input id="qiN" class="input" type="number" min="1" max="4" value="1" />
+          <input id="zN" class="input" type="number" min="1" max="4" value="1" />
         </div>
       </div>
-      <div class="grid2">
+
+      <div class="hint">
+        建议：2048 更清晰但更慢更贵；n&gt;1 会输出多张。<br/>
+        Tip: 2048 is sharper but slower/more expensive; n&gt;1 outputs multiple images.
+      </div>
+
+      <div class="row">
+        <button class="btn primary" id="btnZRun">执行 / Generate</button>
+      </div>
+    </section>
+
+    <section class="card model-panel" id="panelZTurbo">
+      <h2>z-image-turbo（文生图 / Text-to-Image）</h2>
+
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="zTurboPrompt" class="textarea" rows="6" placeholder="例如：一张构图的英语电影《回忆之味》的电影海报"></textarea>
+
+      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）</label>
+      <textarea id="zTurboNeg" class="textarea" rows="3" placeholder="例如：指导模型避免生成所描述的内容"></textarea>
+
+      <div class="grid3">
+        <div>
+          <label class="lab">分辨率 Size</label>
+          <select id="zTurboSize" class="input">
+            <option value="2048x2048">1:1 (2048x2048)</option>
+          </select>
+        </div>
         <div>
           <label class="lab">num_inference_steps（1-50）</label>
-          <input id="qiSteps" class="input" type="number" min="1" max="50" value="4" />
+          <input id="zTurboSteps" class="input" type="number" min="1" max="50" value="9" />
         </div>
         <div>
-          <label class="lab">cfg_scale（0-10）</label>
-          <input id="qiCfg" class="input" type="number" min="0" max="10" step="0.5" value="1" />
+          <label class="lab">seed（0=随机 / random）</label>
+          <input id="zTurboSeed" class="input" type="number" min="0" max="2147483647" value="0" />
         </div>
       </div>
-      <label class="lab">seed（0=随机）</label>
-      <input id="qiSeed" class="input" type="number" min="0" max="2147483647" value="0" />
+
+      <div class="grid3">
+        <label class="chk">
+          <input type="checkbox" id="zTurboFailover" checked />
+          X-Failover-Enabled 故障转移
+        </label>
+      </div>
+
       <div class="row">
-        <button class="btn primary" id="btnQwenImageRun">执行 / Generate</button>
+        <button class="btn primary" id="btnZTurboRun">执行 / Generate</button>
       </div>
     </section>
 
-    <!-- Model 2: z-image-turbo -->
-    <section class="card model-panel" id="panelZImageTurbo">
-      <h2>z-image-turbo（文生图）</h2>
-      <label class="lab">提示词 Prompt</label>
-      <textarea id="ztPrompt" class="textarea" rows="6" placeholder="例如：一张虚构的英语电影《回忆之味》的电影海报..."></textarea>
-      <div class="grid2">
+    <section class="card model-panel" id="panelQwenImage">
+      <h2>Qwen-Image（文生图 / Text-to-Image）</h2>
+
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="qwenPrompt" class="textarea" rows="6" placeholder="例如：一则典雅庄重的对联悬挂于厅堂之中，房间是个安静古典的中式布置"></textarea>
+
+      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）</label>
+      <textarea id="qwenNeg" class="textarea" rows="3" placeholder="例如：指导模型避免生成所描述的内容"></textarea>
+
+      <div class="grid3">
         <div>
-          <label class="lab">分辨率 Resolution</label>
-          <select id="ztRes" class="input">
-            <option value="2048*2048">1:1 (2048*2048)</option>
-            <option value="2048*1536">4:3 (2048*1536)</option>
-            <option value="1536*2048">3:4 (1536*2048)</option>
-            <option value="2048*1360">3:2 (2048*1360)</option>
-            <option value="1360*2048">2:3 (1360*2048)</option>
-            <option value="2048*1152">16:9 (2048*1152)</option>
-            <option value="1152*2048">9:16 (1152*2048)</option>
+          <label class="lab">分辨率 Size</label>
+          <select id="qwenSize" class="input">
+            <option value="2048x2048">1:1 (2048x2048)</option>
           </select>
         </div>
         <div>
-          <label class="lab">张数 n（1-4）</label>
-          <input id="ztN" class="input" type="number" min="1" max="4" value="1" />
-        </div>
-      </div>
-      <div class="grid2">
-        <div>
-          <label class="lab">num_inference_steps</label>
-          <input id="ztSteps" class="input" type="number" min="1" max="50" value="9" />
+          <label class="lab">num_inference_steps（1-100）</label>
+          <input id="qwenSteps" class="input" type="number" min="1" max="100" value="4" />
         </div>
         <div>
-          <label class="lab">seed</label>
-          <input id="ztSeed" class="input" type="number" min="0" max="2147483647" value="0" />
+          <label class="lab">cfg_scale（0-20）</label>
+          <input id="qwenCfg" class="input" type="number" min="0" max="20" step="0.5" value="1" />
         </div>
       </div>
-      <div>
-        <label class="lab">lora_scale</label>
-        <input id="ztLoraScale" class="input" type="number" min="0" max="5" step="0.1" value="0" />
+
+      <div class="grid3">
+        <div>
+          <label class="lab">seed（正整数 / positive integer）</label>
+          <input id="qwenSeed" class="input" type="number" min="0" max="2147483647" value="0" />
+        </div>
+        <div>
+          <label class="lab">num_images_per_prompt（0-4）</label>
+          <input id="qwenN" class="input" type="number" min="0" max="4" value="0" />
+        </div>
       </div>
-      <label class="chk">
-        <input type="checkbox" id="ztFailover" checked />
-        启用 X-Failover-Enabled 故障转移
-      </label>
+
       <div class="row">
-        <button class="btn primary" id="btnZImageTurboRun">执行 / Generate</button>
+        <button class="btn primary" id="btnQwenRun">执行 / Generate</button>
       </div>
     </section>
 
-    <!-- Model 3: Qwen-Image-2512 -->
     <section class="card model-panel" id="panelQwenImage2512">
-      <h2>Qwen-Image-2512（文生图）</h2>
-      <label class="lab">提示词 Prompt</label>
-      <textarea id="qi2512Prompt" class="textarea" rows="6" placeholder="例如：A young girl wearing school uniform stands in a classroom..."></textarea>
-      <div class="grid2">
-        <div>
-          <label class="lab">分辨率 Resolution</label>
-          <select id="qi2512Res" class="input">
-            <option value="2048*2048">1:1 (2048*2048)</option>
-            <option value="2048*1536">4:3 (2048*1536)</option>
-            <option value="1536*2048">3:4 (1536*2048)</option>
-            <option value="2048*1360">3:2 (2048*1360)</option>
-            <option value="1360*2048">2:3 (1360*2048)</option>
-            <option value="2048*1152">16:9 (2048*1152)</option>
-            <option value="1152*2048">9:16 (1152*2048)</option>
-          </select>
-        </div>
-        <div>
-          <label class="lab">张数 n（1-4）</label>
-          <input id="qi2512N" class="input" type="number" min="1" max="4" value="1" />
-        </div>
-      </div>
-      <div class="grid2">
-        <div>
-          <label class="lab">num_inference_steps</label>
-          <input id="qi2512Steps" class="input" type="number" min="1" max="50" value="4" />
-        </div>
-        <div>
-          <label class="lab">cfg_scale</label>
-          <input id="qi2512Cfg" class="input" type="number" min="0" max="10" step="0.5" value="1" />
-        </div>
-      </div>
-      <label class="lab">seed</label>
-      <input id="qi2512Seed" class="input" type="number" min="0" max="2147483647" value="0" />
-      <div class="row">
-        <button class="btn primary" id="btnQwenImage2512Run">执行 / Generate</button>
-      </div>
-    </section>
+      <h2>Qwen-Image-2512（文生图 / Text-to-Image）</h2>
 
-    <!-- Model 4: Z-Image -->
-    <section class="card model-panel" id="panelZImage">
-      <h2>Z-Image（文生图）</h2>
-      <label class="lab">提示词 Prompt</label>
-      <textarea id="zImagePrompt" class="textarea" rows="6" placeholder="例如：A robot sitting on an open grassy field, painting on a canvas..."></textarea>
-      <div class="grid2">
+      <label class="lab">提示词 Prompt（中/英均可 / CN&EN OK）</label>
+      <textarea id="qwen2512Prompt" class="textarea" rows="6" placeholder="例如：一则典雅庄重的对联悬挂于厅堂之中，房间是个安静古典的中式布置"></textarea>
+
+      <label class="lab">负面提示词 Negative Prompt（可选 / Optional）</label>
+      <textarea id="qwen2512Neg" class="textarea" rows="3" placeholder="例如：指导模型避免生成所描述的内容"></textarea>
+
+      <div class="grid3">
         <div>
-          <label class="lab">分辨率 Resolution / size</label>
-          <select id="zImageRes" class="input">
-            <option value="1024*1024">1:1 (1024*1024)</option>
-            <option value="256*256">1:1 (256*256)</option>
-            <option value="512*512">1:1 (512*512)</option>
-            <option value="1024*768">4:3 (1024*768)</option>
-            <option value="768*1024">3:4 (768*1024)</option>
-            <option value="1024*576">16:9 (1024*576)</option>
-            <option value="576*1024">9:16 (576*1024)</option>
+          <label class="lab">分辨率 Size</label>
+          <select id="qwen2512Size" class="input">
+            <option value="1152x2048">9:16 (1152x2048)</option>
+            <option value="2048x2048">1:1 (2048x2048)</option>
           </select>
         </div>
         <div>
-          <label class="lab">guidance_scale</label>
-          <input id="zImageGuidance" class="input" type="number" min="0" max="20" step="0.5" value="5" />
-        </div>
-      </div>
-      <div class="grid2">
-        <div>
-          <label class="lab">num_inference_steps</label>
-          <input id="zImageSteps" class="input" type="number" min="1" max="100" value="30" />
+          <label class="lab">num_inference_steps（1-100）</label>
+          <input id="qwen2512Steps" class="input" type="number" min="1" max="100" value="4" />
         </div>
         <div>
-          <label class="lab">seed</label>
-          <input id="zImageSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
+          <label class="lab">cfg_scale（0-20）</label>
+          <input id="qwen2512Cfg" class="input" type="number" min="0" max="20" step="0.5" value="1" />
         </div>
       </div>
+
+      <div class="grid3">
+        <div>
+          <label class="lab">seed（正整数 / positive integer）</label>
+          <input id="qwen2512Seed" class="input" type="number" min="0" max="2147483647" value="0" />
+        </div>
+      </div>
+
       <div class="row">
-        <button class="btn primary" id="btnZImageRun">执行 / Generate</button>
+        <button class="btn primary" id="btnQwen2512Run">执行 / Generate</button>
       </div>
     </section>
 
