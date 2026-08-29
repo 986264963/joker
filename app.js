@@ -1,8 +1,8 @@
 // Moark Web (Cloudflare Pages/Workers)
-// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.[span_11](start_span)[span_11](end_span)
-// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.[span_12](start_span)[span_12](end_span)
+// - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
+// - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
 
-const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)[span_13](start_span)[span_13](end_span)
+const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
 const $ = (id) => document.getElementById(id);
 
 const Z_RESOLUTIONS = {
@@ -173,18 +173,22 @@ function clearOutput() {
   $("output").innerHTML = "";
 }
 
-// Same-origin proxy to ai.gitee.com/v1[span_14](start_span)[span_14](end_span)
-async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
+// Same-origin proxy to ai.gitee.com/v1 with custom headers support
+async function apiFetch(path, {method="GET", headers={}, body=null, signal=null, customHeaders={}}={}) {
+  const mergedHeaders = {
+    ...headers,
+    ...customHeaders
+  };
   const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
     method,
-    headers,
+    headers: mergedHeaders,
     body,
     signal,
   });
   return res;
 }
 
-// Download proxy for arbitrary file_url/image urls to avoid CORS[span_15](start_span)[span_15](end_span)
+// Download proxy for arbitrary file_url/image urls to avoid CORS
 async function dlFetch(url, {signal=null}={}) {
   const u = `/dl?url=${encodeURIComponent(url)}`;
   const res = await fetch(u, {method:"GET", signal});
@@ -280,7 +284,6 @@ async function runHunyuanVideo() {
   const num_inferenece_steps = clampInt($("hySteps").value, 1, 10, 10);
   const num_frames = clampInt($("hyFrames").value, 81, 241, 241);
 
-  // seed must be positive integer
   const seedRaw = $("hySeed").value;
   const seed = Number.parseInt(String(seedRaw), 10);
   if (!Number.isFinite(seed) || seed <= 0) {
@@ -398,7 +401,7 @@ async function runHunyuanVideo() {
   }
 }
 
-// -------- z-image --------
+// -------- z-image (z-image-turbo with X-Failover-Enabled & extra_body) --------
 async function runZImage() {
   const apiKey = getApiKey();
   rememberKeyMaybe();
@@ -406,12 +409,28 @@ async function runZImage() {
   const prompt = $("zPrompt").value.trim();
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
-  const n = clampInt($("zN").value, 1, 4, 1);
-  const [w, h] = Z_RESOLUTIONS[$("zRes").value];
+  const [w, h] = Z_RESOLUTIONS[$("zRes").value] || [2048, 2048];
   const size = `${w}x${h}`;
+  const steps = clampInt($("zSteps")?.value, 1, 50, 9);
+  const seedVal = clampInt($("zSeed")?.value, 0, 2147483647, 0);
+  const negative_prompt = $("zNeg")?.value.trim() || "";
 
-  setStatus("z-image 生成中... / Generating...");
-  const payload = { prompt, model: "z-image-turbo", n, size };
+  setStatus("z-image-turbo 生成中... / Generating...");
+  
+  const payload = {
+    model: "z-image-turbo",
+    prompt,
+    size,
+    extra_body: {
+      width: w,
+      height: h,
+      num_inference_steps: steps,
+      seed: seedVal,
+      negative_prompt: negative_prompt,
+      lora_weights: [],
+      lora_scale: 0
+    }
+  };
 
   const res = await apiFetch("images/generations", {
     method: "POST",
@@ -419,20 +438,23 @@ async function runZImage() {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
+    customHeaders: {
+      "X-Failover-Enabled": "true"
+    },
     body: JSON.stringify(payload),
   });
 
   const j = await readJsonSafely(res);
   if (!res.ok) {
-    setStatus("z-image 失败 / Failed", "err");
-    addOutputItem({ title: "z-image 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
+    setStatus("z-image-turbo 失败 / Failed", "err");
+    addOutputItem({ title: "z-image-turbo 生成失败 / Failed", rawJson: j, meta: `HTTP ${res.status}` });
     throw new Error(`API 错误 / API Error (${res.status})`);
   }
 
   const data = Array.isArray(j.data) ? j.data : [];
   if (!data.length) {
-    addOutputItem({ title: "z-image 返回无数据 / Empty response", rawJson: j });
-    setStatus("z-image 失败 / Failed", "err");
+    addOutputItem({ title: "z-image-turbo 返回无数据 / Empty response", rawJson: j });
+    setStatus("z-image-turbo 失败 / Failed", "err");
     return;
   }
 
@@ -449,23 +471,23 @@ async function runZImage() {
       const blob = new Blob([bytes], { type: "image/png" });
       blobInfo = { blob, objUrl: URL.createObjectURL(blob) };
     } else {
-      addOutputItem({ title: `z-image 第${i+1}张无数据 / No image data`, rawJson: item });
+      addOutputItem({ title: `z-image-turbo 第${i+1}张无数据 / No image data`, rawJson: item });
       continue;
     }
 
     const img = document.createElement("img");
     img.src = blobInfo.objUrl;
 
-    const filename = `z-image-${nowTs()}-${i+1}.png`;
+    const filename = `z-image-turbo-${nowTs()}-${i+1}.png`;
     addOutputItem({
-      title: `z-image 输出 #${i+1}`,
-      meta: `size=${size}, n=${n}`,
+      title: `z-image-turbo 输出 #${i+1}`,
+      meta: `size=${size}, steps=${steps}`,
       element: img,
       download: { href: blobInfo.objUrl, filename },
     });
   }
 
-  setStatus("z-image 成功 / Success", "ok");
+  setStatus("z-image-turbo 成功 / Success", "ok");
 }
 
 // -------- Qwen-Image-2512 --------
@@ -484,27 +506,27 @@ async function runQwenImage() {
   const guidance = clampFloat($("qwenGuidance").value, 0, 20, 1.0);
   
   const seedVal = clampInt($("qwenSeed").value, -1, 2147483647, -1);
-  // 随机种子：若为 -1 则随机生成一个正整数，解决多次生成返回同一张图的问题[span_16](start_span)[span_16](end_span)
   const seed = seedVal < 0 ? Math.floor(Math.random() * 2147483647) : seedVal;
 
   const negative_prompt = $("qwenNeg").value.trim();
 
   setStatus("Qwen-Image-2512 生成中... / Generating...");
   
-  // 按照官方 API 规范封装高分辨率与全参数[span_17](start_span)[span_17](end_span)
   const payload = {
     model: "Qwen-Image-2512",
     prompt,
     size,
     n,
-    width: w,
-    height: h,
-    num_inference_steps: steps,
-    cfg_scale: guidance,
-    seed: seed,
-    negative_prompt: negative_prompt || "",
-    lora_weights: [],
-    lora_scale: 0
+    extra_body: {
+      num_images_per_prompt: n,
+      width: w,
+      height: h,
+      num_inference_steps: steps,
+      cfg_scale: guidance,
+      seed: seed,
+      negative_prompt: negative_prompt || "",
+      lora_weights: []
+    }
   };
 
   const res = await apiFetch("images/generations", {
