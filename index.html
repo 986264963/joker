@@ -2,323 +2,80 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moark Web - AI Media</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Moark Web - 文生图精简版</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #111; color: #eee; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card { background: #1e1e1e; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #333; }
+        h2 { margin-top: 0; color: #61dafb; font-size: 1.2rem; }
+        input, select, textarea { width: 100%; padding: 10px; margin: 5px 0; background: #252526; border: 1px solid #555; color: #fff; border-radius: 4px; box-sizing: border-box; }
+        button { background: #007acc; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin-right: 10px; }
+        button:hover { background: #005f9e; }
+        #output { margin-top: 20px; }
+        .item { background: #252526; padding: 15px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #444; }
+        .item img { max-width: 100%; border-radius: 4px; margin-top: 10px; }
+        .row { display: flex; gap: 10px; }
+        .col { flex: 1; }
+        #statusBadge { display: inline-block; padding: 5px 10px; border-radius: 4px; margin-bottom: 20px; font-size: 0.9rem; }
+    </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Moark Web</h1>
-            <p>AI Media Generation Tool</p>
-        </header>
-
-        <div class="api-section">
-            <input type="password" id="apiKey" placeholder="请输入 API Key (Bearer Token)" />
-            <label class="chk"><input type="checkbox" id="rememberKey" /> 记住 Key</label>
-            <button class="btn" id="btnClearKey">清除</button>
+        <div id="statusBadge">准备就绪</div>
+        
+        <div class="card">
+            <h2>全局设置</h2>
+            <input type="password" id="apiKey" placeholder="输入 Gitee AI API Key">
+            <label><input type="checkbox" id="rememberKey"> 记住 Key</label>
+            <button id="btnClear">清空输出</button>
         </div>
 
-        <div class="model-select">
-            <label for="modelSel">选择模型 / Select Model:</label>
-            <select id="modelSel">
-                <option value="z-image-turbo">Z-Image Turbo</option>
-                <option value="z-image">Z-Image (Standard)</option>
-                <option value="Qwen-Image-2512">Qwen-Image-2512</option>
-                <option value="Qwen-Image">Qwen-Image</option>
-                <option value="Edit-2511">Edit-2511 (Image Edit)</option>
-                <option value="Wan2.2-I2V-A14B">Wan2.2-I2V-A14B (Video)</option>
-                <option value="HunyuanVideo-1.5">HunyuanVideo-1.5 (Video)</option>
-            </select>
+        <!-- 1. Z-Image Turbo -->
+        <div class="card">
+            <h2>Z-Image Turbo (极速)</h2>
+            <textarea id="zTurboPrompt" rows="2" placeholder="提示词..."></textarea>
+            <select id="zTurboRes"></select>
+            <button id="btnZTurbo">生成 Turbo</button>
         </div>
 
-        <div id="statusBadge" class="status-badge">准备就绪 / Ready</div>
-
-        <!-- Z-Image Turbo Panel -->
-        <div id="panelZTurbo" class="panel">
-            <h2>Z-Image Turbo</h2>
-            <div class="form-group">
-                <label for="zTurboPrompt">提示词 / Prompt:</label>
-                <textarea id="zTurboPrompt" rows="3" placeholder="描述你想要生成的图片..."></textarea>
+        <!-- 2. Z-Image Standard -->
+        <div class="card">
+            <h2>Z-Image Standard (标准)</h2>
+            <textarea id="zStdPrompt" rows="2" placeholder="提示词..."></textarea>
+            <div class="row">
+                <div class="col"><select id="zStdRes"></select></div>
+                <div class="col"><input type="number" id="zStdSteps" value="30" placeholder="步数"></div>
+                <div class="col"><input type="number" id="zStdCfg" value="5" placeholder="CFG" step="0.1"></div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="zTurboRes">分辨率 / Resolution:</label>
-                    <select id="zTurboRes"></select>
-                </div>
-                <div class="form-group">
-                    <label for="zTurboN">生成数量 / N:</label>
-                    <input type="number" id="zTurboN" value="1" min="1" max="4">
-                </div>
-            </div>
-            <button class="btn btn-primary" id="btnZTurboRun">生成 Z-Image Turbo / Generate</button>
+            <input type="number" id="zStdSeed" placeholder="Seed (留空随机)">
+            <button id="btnZStd">生成 Standard</button>
         </div>
 
-        <!-- Z-Image (Standard) Panel -->
-        <div id="panelZ" class="panel">
-            <h2>Z-Image (Standard)</h2>
-            <div class="form-group">
-                <label for="zPrompt">提示词 / Prompt:</label>
-                <textarea id="zPrompt" rows="3" placeholder="描述你想要生成的图片..."></textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="zRes">分辨率 / Resolution:</label>
-                    <select id="zRes"></select>
-                </div>
-                <div class="form-group">
-                    <label for="zN">生成数量 / N:</label>
-                    <input type="number" id="zN" value="1" min="1" max="4">
-                </div>
-            </div>
-            <button class="btn btn-primary" id="btnZRun">生成 Z-Image / Generate</button>
-        </div>
-
-        <!-- Qwen-Image-2512 Panel -->
-        <div id="panelQwen2512" class="panel">
-            <h2>Qwen-Image-2512</h2>
-            <div class="form-group">
-                <label for="qwen2512Prompt">提示词 / Prompt:</label>
-                <textarea id="qwen2512Prompt" rows="3" placeholder="描述你想要生成的图片..."></textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="qwen2512Res">分辨率 / Resolution:</label>
-                    <select id="qwen2512Res"></select>
-                </div>
-                <div class="form-group">
-                    <label for="qwen2512Steps">推理步数 / Steps:</label>
-                    <input type="number" id="qwen2512Steps" value="4" min="1" max="50">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="qwen2512Cfg">CFG Scale:</label>
-                    <input type="number" id="qwen2512Cfg" value="1" min="1" max="20" step="0.1">
-                </div>
-                <div class="form-group">
-                    <label for="qwen2512Seed">Seed:</label>
-                    <input type="number" id="qwen2512Seed" placeholder="随机">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="qwen2512Lora">LoRA Scale:</label>
-                <input type="number" id="qwen2512Lora" value="0" min="0" max="1" step="0.05">
-            </div>
-            <div class="form-group">
-                <label for="qwen2512Neg">反向提示词 / Negative Prompt:</label>
-                <input type="text" id="qwen2512Neg" placeholder="不希望出现的内容">
-            </div>
-            <button class="btn btn-primary" id="btnQwen2512Run">生成 Qwen-Image-2512 / Generate</button>
-        </div>
-
-        <!-- Qwen-Image Panel -->
-        <div id="panelQwen" class="panel">
+        <!-- 3. Qwen-Image -->
+        <div class="card">
             <h2>Qwen-Image</h2>
-            <div class="form-group">
-                <label for="qwenPrompt">提示词 / Prompt:</label>
-                <textarea id="qwenPrompt" rows="3" placeholder="描述你想要生成的图片..."></textarea>
+            <textarea id="qwenPrompt" rows="2" placeholder="提示词..."></textarea>
+            <div class="row">
+                <div class="col"><select id="qwenRes"></select></div>
+                <div class="col"><input type="number" id="qwenSteps" value="30" placeholder="步数"></div>
+                <div class="col"><input type="number" id="qwenCfg" value="4" placeholder="CFG" step="0.1"></div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="qwenRes">分辨率 / Resolution:</label>
-                    <select id="qwenRes"></select>
-                </div>
-                <div class="form-group">
-                    <label for="qwenN">生成数量 / N:</label>
-                    <input type="number" id="qwenN" value="1" min="1" max="4">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="qwenSteps">推理步数 / Steps:</label>
-                    <input type="number" id="qwenSteps" value="30" min="1" max="50">
-                </div>
-                <div class="form-group">
-                    <label for="qwenCfg">CFG Scale:</label>
-                    <input type="number" id="qwenCfg" value="4" min="1" max="20" step="0.1">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="qwenSeed">Seed:</label>
-                    <input type="number" id="qwenSeed" placeholder="随机">
-                </div>
-                <div class="form-group">
-                    <label for="qwenLora">LoRA Scale:</label>
-                    <input type="number" id="qwenLora" value="0" min="0" max="1" step="0.05">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="qwenNeg">反向提示词 / Negative Prompt:</label>
-                <input type="text" id="qwenNeg" placeholder="不希望出现的内容">
-            </div>
-            <button class="btn btn-primary" id="btnQwenRun">生成 Qwen-Image / Generate</button>
+            <button id="btnQwen">生成 Qwen</button>
         </div>
 
-        <!-- Edit-2511 Panel -->
-        <div id="panelEdit" class="panel">
-            <h2>Edit-2511 (Image Edit)</h2>
-            <div class="form-group">
-                <label>上传图片 (2张) / Upload Images (2):</label>
-                <input type="file" id="editImg1" accept="image/*" />
-                <input type="file" id="editImg2" accept="image/*" />
+        <!-- 4. Qwen-Image-2512 -->
+        <div class="card">
+            <h2>Qwen-Image-2512</h2>
+            <textarea id="qwen2512Prompt" rows="2" placeholder="提示词..."></textarea>
+            <div class="row">
+                <div class="col"><select id="qwen2512Res"></select></div>
+                <div class="col"><input type="number" id="qwen2512Steps" value="4" placeholder="步数"></div>
+                <div class="col"><input type="number" id="qwen2512Cfg" value="1" placeholder="CFG" step="0.1"></div>
             </div>
-            <div class="form-group">
-                <label for="editPrompt">提示词 / Prompt:</label>
-                <textarea id="editPrompt" rows="3" placeholder="描述编辑指令..."></textarea>
-            </div>
-            <div class="form-group" id="editTaskTypes"></div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="editSteps">推理步数 / Steps:</label>
-                    <input type="number" id="editSteps" value="4" min="1" max="50">
-                </div>
-                <div class="form-group">
-                    <label for="editGuidance">Guidance Scale:</label>
-                    <input type="number" id="editGuidance" value="1.0" min="0" max="10" step="0.1">
-                </div>
-            </div>
-            <label class="chk"><input type="checkbox" id="editOpenUrl" /> 完成后打开 file_url</label>
-            <button class="btn btn-primary" id="btnEditRun">执行编辑 / Run Edit</button>
+            <button id="btnQwen2512">生成 Qwen-2512</button>
         </div>
 
-        <!-- Wan2.2 Panel -->
-        <div id="panelWan" class="panel">
-            <h2>Wan2.2-I2V-A14B (Image to Video)</h2>
-            <div class="form-group">
-                <label for="wanImg">上传图片 / Upload Image:</label>
-                <input type="file" id="wanImg" accept="image/*" />
-            </div>
-            <div class="form-group">
-                <label for="wanPrompt">提示词 / Prompt:</label>
-                <textarea id="wanPrompt" rows="3" placeholder="描述视频内容..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="wanNeg">反向提示词 / Negative Prompt:</label>
-                <input type="text" id="wanNeg" placeholder="不希望出现的内容">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="wanResPreset">分辨率预设 / Resolution Preset:</label>
-                    <select id="wanResPreset"></select>
-                </div>
-                <div class="form-group">
-                    <label for="wanPreset">参数预设 / Params Preset:</label>
-                    <select id="wanPreset">
-                        <option value="default">默认 / Default</option>
-                        <option value="hq">更清晰 / Higher Quality</option>
-                        <option value="dynamic">更动感 / More Dynamic</option>
-                        <option value="fast">更快 / Faster</option>
-                    </select>
-                    <button class="btn" id="btnWanApplyPreset" type="button">应用预设 / Apply</button>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="wanW">宽度 / Width:</label>
-                    <input type="number" id="wanW" value="832" min="64" max="2048">
-                </div>
-                <div class="form-group">
-                    <label for="wanH">高度 / Height:</label>
-                    <input type="number" id="wanH" value="480" min="64" max="2048">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="wanSteps">推理步数 / Steps:</label>
-                    <input type="number" id="wanSteps" value="30" min="1" max="100">
-                </div>
-                <div class="form-group">
-                    <label for="wanGuidance">Guidance Scale:</label>
-                    <input type="number" id="wanGuidance" value="5.0" min="0" max="20" step="0.1">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="wanFps">帧率 / FPS:</label>
-                    <input type="number" id="wanFps" value="24" min="1" max="60">
-                </div>
-                <div class="form-group">
-                    <label for="wanDuration">时长(秒) / Duration (s):</label>
-                    <input type="number" id="wanDuration" value="5" min="0.5" max="60" step="0.5">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="wanFrames">总帧数 / Total Frames:</label>
-                    <input type="number" id="wanFrames" value="120" min="1" max="300">
-                    <label class="chk"><input type="checkbox" id="wanAutoFrames" checked /> 自动 / Auto (FPS * 5)</label>
-                </div>
-                <div class="form-group">
-                    <label for="wanSeed">Seed:</label>
-                    <input type="number" id="wanSeed" value="-1" min="-1" max="2147483647">
-                </div>
-            </div>
-            <div class="form-row">
-                <label class="chk"><input type="checkbox" id="wanWatermark" checked /> 添加水印 / Watermark</label>
-                <label class="chk"><input type="checkbox" id="wanPromptExtend" /> 提示词扩展 / Prompt Extend</label>
-                <label class="chk"><input type="checkbox" id="wanZipSegments" checked /> 分段生成后打包ZIP / Zip Segments</label>
-                <label class="chk"><input type="checkbox" id="wanOpenUrl" /> 完成后打开 file_url</label>
-            </div>
-            <button class="btn btn-primary" id="btnWanRun">生成视频 / Generate Video</button>
-        </div>
-
-        <!-- HunyuanVideo Panel -->
-        <div id="panelHunyuan" class="panel">
-            <h2>HunyuanVideo-1.5 (Text to Video)</h2>
-            <div class="form-group">
-                <label for="hyPrompt">提示词 / Prompt:</label>
-                <textarea id="hyPrompt" rows="3" placeholder="描述视频内容..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="hyNeg">反向提示词 / Negative Prompt:</label>
-                <input type="text" id="hyNeg" placeholder="不希望出现的内容">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="hyAspect">宽高比 / Aspect Ratio:</label>
-                    <select id="hyAspect">
-                        <option value="16:9">16:9</option>
-                        <option value="9:16">9:16</option>
-                        <option value="1:1">1:1</option>
-                        <option value="4:3">4:3</option>
-                        <option value="3:4">3:4</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="hySteps">推理步数 / Steps:</label>
-                    <input type="number" id="hySteps" value="10" min="1" max="10">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="hyFrames">总帧数 / Total Frames:</label>
-                    <select id="hyFrames">
-                        <option value="81">81</option>
-                        <option value="121">121</option>
-                        <option value="161">161</option>
-                        <option value="241" selected>241</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="hyFps">帧率 / FPS:</label>
-                    <input type="number" id="hyFps" value="24" min="1" max="24">
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="hySeed">Seed (正整数 / Positive Integer):</label>
-                <input type="number" id="hySeed" placeholder="例如 / e.g. 12345">
-            </div>
-            <label class="chk"><input type="checkbox" id="hyOpenUrl" /> 完成后打开 file_url</label>
-            <button class="btn btn-primary" id="btnHyRun">生成视频 / Generate Video</button>
-        </div>
-
-        <div class="actions">
-            <button class="btn" id="btnClearOutput">清空输出 / Clear Output</button>
-        </div>
-
-        <div id="output" class="output"></div>
+        <div id="output"></div>
     </div>
     <script src="app.js"></script>
 </body>
