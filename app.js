@@ -5,19 +5,36 @@
 const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
 const $ = (id) => document.getElementById(id);
 
-const IMG_RESOLUTIONS = {
+// FLUX.2-dev 独立分辨率 (按图1)
+const FLUX_RESOLUTIONS = {
   "1:1 (1024x1024)": "1024x1024",
-  "3:4 (768x1024)": "768x1024",
   "4:3 (1024x768)": "1024x768",
+  "3:4 (768x1024)": "768x1024",
   "16:9 (1024x576)": "1024x576",
   "9:16 (576x1024)": "576x1024",
+  "3:2 (1024x640)": "1024x640",
+  "2:3 (640x1024)": "640x1024",
+};
+
+// z-image-turbo 独立分辨率 (按图3/4)
+const Z_IMAGE_RESOLUTIONS = {
   "1:1 (2048x2048)": "2048x2048",
-  "9:16 (1152x2048)": "1152x2048",
-  "16:9 (2048x1152)": "2048x1152",
-  "3:4 (1536x2048)": "1536x2048",
   "4:3 (2048x1536)": "2048x1536",
-  "2:3 (1360x2048)": "1360x2048",
+  "3:4 (1536x2048)": "1536x2048",
   "3:2 (2048x1360)": "2048x1360",
+  "2:3 (1360x2048)": "1360x2048",
+  "16:9 (2048x1152)": "2048x1152",
+  "9:16 (1152x2048)": "1152x2048",
+};
+
+// Qwen-Image-2512 独立分辨率 (按图5/6，注意没有 1:1)
+const QWEN_IMAGE_RESOLUTIONS = {
+  "4:3 (2048x1536)": "2048x1536",
+  "3:4 (1536x2048)": "1536x2048",
+  "3:2 (2048x1360)": "2048x1360",
+  "2:3 (1360x2048)": "1360x2048",
+  "16:9 (2048x1152)": "2048x1152",
+  "9:16 (1152x2048)": "1152x2048",
 };
 
 const EDIT_TASK_TYPES = ["id", "style", "pose", "layout", "color", "background"];
@@ -195,13 +212,13 @@ function clampFloat(v, lo, hi, defv) {
   return defv;
 }
 
-// 动态获取随机种子
+// 获取随机种子：如果输入为空、-1、0 或小于0，则生成随机正整数
 function getRandomSeed(inputId) {
-  const raw = $(inputId).value;
-  const n = Number.parseInt(String(raw), 10);
-  // 如果没填，或者是 -1，或者小于 0，则生成随机种子
-  if (!Number.isFinite(n) || n < 0) {
-    return Math.floor(Math.random() * 2147483647);
+  const raw = $(inputId).value.trim();
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) {
+    // 生成 1 到 2147483647 之间的随机整数
+    return Math.floor(Math.random() * 2147483647) + 1;
   }
   return n;
 }
@@ -284,13 +301,14 @@ async function runFlux() {
   const prompt = $("fluxPrompt").value.trim();
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
-  const size = IMG_RESOLUTIONS[$("fluxRes").value];
+  const size = FLUX_RESOLUTIONS[$("fluxRes").value];
   const steps = clampInt($("fluxSteps").value, 1, 100, 50);
   const guidance = clampFloat($("fluxGuidance").value, 1, 200, 100);
   const seed = getRandomSeed("fluxSeed");
   const openAfter = $("fluxOpenUrl").checked;
 
-  // 根据截图，FLUX 的参数结构
+  setStatus(`FLUX.2-dev 生成中... (seed=${seed}) / Generating...`);
+
   const payload = {
     prompt,
     model: "FLUX.2-dev",
@@ -304,7 +322,6 @@ async function runFlux() {
     }
   };
 
-  setStatus("FLUX.2-dev 生成中... / Generating...");
   const res = await apiFetch("images/generations", {
     method: "POST",
     headers: {
@@ -334,12 +351,13 @@ async function runZImage() {
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
   const negative_prompt = $("zNeg").value.trim();
-  const size = IMG_RESOLUTIONS[$("zRes").value];
+  const size = Z_IMAGE_RESOLUTIONS[$("zRes").value];
   const steps = clampInt($("zSteps").value, 1, 100, 50);
   const seed = getRandomSeed("zSeed");
   const openAfter = $("zOpenUrl")?.checked || false;
 
-  // 根据截图，z-image 的参数结构
+  setStatus(`z-image-turbo 生成中... (seed=${seed}) / Generating...`);
+
   const payload = {
     prompt,
     model: "z-image-turbo",
@@ -355,7 +373,6 @@ async function runZImage() {
     }
   };
 
-  setStatus("z-image-turbo 生成中... / Generating...");
   const res = await apiFetch("images/generations", {
     method: "POST",
     headers: {
@@ -385,13 +402,14 @@ async function runQwenImage() {
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
   const negative_prompt = $("qwenImgNeg").value.trim();
-  const size = IMG_RESOLUTIONS[$("qwenImgRes").value];
-  const steps = clampInt($("qwenImgSteps").value, 1, 50, 4);
-  const cfg = clampFloat($("qwenImgCfg").value, 1, 20, 1);
+  const size = QWEN_IMAGE_RESOLUTIONS[$("qwenImgRes").value];
+  const steps = clampInt($("qwenImgSteps").value, 1, 20, 4); // 修正上限为 20
+  const cfg = clampFloat($("qwenImgCfg").value, 1, 10, 1);   // 修正上限为 10
   const seed = getRandomSeed("qwenImgSeed");
   const openAfter = $("qwenImgOpenUrl").checked;
 
-  // 根据截图，Qwen-Image 的参数结构（注意 cfg_scale 的使用）
+  setStatus(`Qwen-Image-2512 生成中... (seed=${seed}) / Generating...`);
+
   const payload = {
     prompt,
     model: "Qwen-Image-2512",
@@ -408,7 +426,6 @@ async function runQwenImage() {
     }
   };
 
-  setStatus("Qwen-Image-2512 生成中... / Generating...");
   const res = await apiFetch("images/generations", {
     method: "POST",
     headers: {
@@ -539,21 +556,21 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
 
 // ---- init UI ----
 function initUi() {
-  // 初始化所有分辨率下拉框
-  const initResSelect = (selectId, defaultKey) => {
+  // 初始化各自的分辨率下拉框
+  const initResSelect = (selectId, resolutions, defaultKey) => {
     const sel = $(selectId);
     if (!sel) return;
-    for (const k of Object.keys(IMG_RESOLUTIONS)) {
+    for (const k of Object.keys(resolutions)) {
       const o = document.createElement("option");
       o.value = k; o.textContent = k;
       sel.appendChild(o);
     }
-    if (defaultKey && IMG_RESOLUTIONS[defaultKey]) sel.value = defaultKey;
+    if (defaultKey && resolutions[defaultKey]) sel.value = defaultKey;
   };
 
-  initResSelect("fluxRes", "1:1 (1024x1024)");
-  initResSelect("zRes", "9:16 (1152x2048)");
-  initResSelect("qwenImgRes", "9:16 (1152x2048)");
+  initResSelect("fluxRes", FLUX_RESOLUTIONS, "1:1 (1024x1024)");
+  initResSelect("zRes", Z_IMAGE_RESOLUTIONS, "9:16 (1152x2048)");
+  initResSelect("qwenImgRes", QWEN_IMAGE_RESOLUTIONS, "9:16 (1152x2048)");
 
   // 任务类型 checkboxes
   const box = $("editTaskTypes");
