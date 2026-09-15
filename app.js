@@ -217,7 +217,6 @@ function getRandomSeed(inputId) {
   const raw = $(inputId).value.trim();
   const n = Number.parseInt(raw, 10);
   if (!Number.isFinite(n) || n <= 0) {
-    // 生成 1 到 2147483647 之间的随机整数
     return Math.floor(Math.random() * 2147483647) + 1;
   }
   return n;
@@ -309,17 +308,16 @@ async function runFlux() {
 
   setStatus(`FLUX.2-dev 生成中... (seed=${seed}) / Generating...`);
 
+  // 注意：extra_body 的内容需要平铺到请求体顶层
   const payload = {
     prompt,
     model: "FLUX.2-dev",
     size,
-    extra_body: {
-      width: 0,
-      height: 0,
-      num_inference_steps: steps,
-      guidance_scale: guidance,
-      seed: seed,
-    }
+    width: 0,
+    height: 0,
+    num_inference_steps: steps,
+    guidance_scale: guidance,
+    seed: seed,
   };
 
   const res = await apiFetch("images/generations", {
@@ -358,19 +356,18 @@ async function runZImage() {
 
   setStatus(`z-image-turbo 生成中... (seed=${seed}) / Generating...`);
 
+  // 注意：extra_body 的内容需要平铺到请求体顶层
   const payload = {
     prompt,
     model: "z-image-turbo",
     size,
-    extra_body: {
-      negative_prompt,
-      width: 0,
-      height: 0,
-      num_inference_steps: steps,
-      seed: seed,
-      lora_weights: [],
-      lora_scale: 0,
-    }
+    negative_prompt,
+    width: 0,
+    height: 0,
+    num_inference_steps: steps,
+    seed: seed,
+    lora_weights: [],
+    lora_scale: 0,
   };
 
   const res = await apiFetch("images/generations", {
@@ -403,27 +400,26 @@ async function runQwenImage() {
 
   const negative_prompt = $("qwenImgNeg").value.trim();
   const size = QWEN_IMAGE_RESOLUTIONS[$("qwenImgRes").value];
-  const steps = clampInt($("qwenImgSteps").value, 1, 20, 4); // 修正上限为 20
-  const cfg = clampFloat($("qwenImgCfg").value, 1, 10, 1);   // 修正上限为 10
+  const steps = clampInt($("qwenImgSteps").value, 1, 20, 4);
+  const cfg = clampFloat($("qwenImgCfg").value, 1, 10, 1);
   const seed = getRandomSeed("qwenImgSeed");
   const openAfter = $("qwenImgOpenUrl").checked;
 
   setStatus(`Qwen-Image-2512 生成中... (seed=${seed}) / Generating...`);
 
+  // 关键修复：把原本放在 extra_body 里的字段全部平铺到顶层
   const payload = {
     prompt,
     model: "Qwen-Image-2512",
     size,
-    extra_body: {
-      width: 0,
-      height: 0,
-      num_inference_steps: steps,
-      cfg_scale: cfg,
-      seed: seed,
-      negative_prompt,
-      lora_weights: [],
-      lora_scale: 0,
-    }
+    width: 0,
+    height: 0,
+    num_inference_steps: steps,
+    cfg_scale: cfg,
+    seed: seed,
+    negative_prompt,
+    lora_weights: [],
+    lora_scale: 0,
   };
 
   const res = await apiFetch("images/generations", {
@@ -556,7 +552,6 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
 
 // ---- init UI ----
 function initUi() {
-  // 初始化各自的分辨率下拉框
   const initResSelect = (selectId, resolutions, defaultKey) => {
     const sel = $(selectId);
     if (!sel) return;
@@ -572,7 +567,6 @@ function initUi() {
   initResSelect("zRes", Z_IMAGE_RESOLUTIONS, "9:16 (1152x2048)");
   initResSelect("qwenImgRes", QWEN_IMAGE_RESOLUTIONS, "9:16 (1152x2048)");
 
-  // 任务类型 checkboxes
   const box = $("editTaskTypes");
   for (const t of EDIT_TASK_TYPES) {
     const label = document.createElement("label");
@@ -587,11 +581,9 @@ function initUi() {
     box.appendChild(label);
   }
 
-  // 模型切换
   $("modelSel").addEventListener("change", (e) => showPanel(e.target.value));
   showPanel($("modelSel").value);
 
-  // 按钮绑定
   $("btnFluxRun").onclick = async () => {
     try { await runFlux(); }
     catch (e) { addOutputItem({ title:"FLUX.2-dev 错误 / Error", meta:String(e) }); }
