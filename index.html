@@ -121,7 +121,7 @@
 
       <div class="grid2">
         <div>
-          <label class="lab">seed（-1=随机 / random）</label>
+          <label class="lab">seed（-1 或 0=随机 / random）</label>
           <input id="fluxSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
         </div>
         <label class="chk" style="margin-top: 28px;">
@@ -131,7 +131,7 @@
       </div>
 
       <div class="hint">
-        提示：每次执行时，如果 seed 为 -1，系统会自动生成一个随机种子，确保每次生成都不一样。
+        提示：每次执行时，如果 seed 为 -1 或 0，系统会自动生成一个随机种子，确保每次生成都不一样。
       </div>
 
       <div class="row" style="margin-top: 16px;">
@@ -159,13 +159,13 @@
           <input id="zSteps" class="input" type="number" min="1" max="100" value="50" />
         </div>
         <div>
-          <label class="lab">seed（-1=随机 / random）</label>
+          <label class="lab">seed（-1 或 0=随机 / random）</label>
           <input id="zSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
         </div>
       </div>
 
       <div class="hint">
-        提示：每次执行时，如果 seed 为 -1，系统会自动生成一个随机种子，确保每次生成都不一样。
+        提示：每次执行时，如果 seed 为 -1 或 0，系统会自动生成一个随机种子，确保每次生成都不一样。
       </div>
 
       <div class="row" style="margin-top: 16px;">
@@ -189,18 +189,18 @@
           <select id="qwenImgRes" class="input"></select>
         </div>
         <div>
-          <label class="lab">num_inference_steps (1-50)</label>
-          <input id="qwenImgSteps" class="input" type="number" min="1" max="50" value="4" />
+          <label class="lab">num_inference_steps (1-20)</label>
+          <input id="qwenImgSteps" class="input" type="number" min="1" max="20" value="4" />
         </div>
         <div>
-          <label class="lab">cfg_scale (1-20)</label>
-          <input id="qwenImgCfg" class="input" type="number" min="1" max="20" step="0.5" value="1" />
+          <label class="lab">cfg_scale (1-10)</label>
+          <input id="qwenImgCfg" class="input" type="number" min="1" max="10" step="0.5" value="1" />
         </div>
       </div>
 
       <div class="grid2">
         <div>
-          <label class="lab">seed（-1=随机 / random）</label>
+          <label class="lab">seed（-1 或 0=随机 / random）</label>
           <input id="qwenImgSeed" class="input" type="number" min="-1" max="2147483647" value="-1" />
         </div>
         <label class="chk" style="margin-top: 28px;">
@@ -210,7 +210,7 @@
       </div>
 
       <div class="hint">
-        提示：每次执行时，如果 seed 为 -1，系统会自动生成一个随机种子，确保每次生成都不一样。
+        提示：每次执行时，如果 seed 为 -1 或 0，系统会自动生成一个随机种子，确保每次生成都不一样。
       </div>
 
       <div class="row" style="margin-top: 16px;">
