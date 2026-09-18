@@ -2,10 +2,10 @@
 // - Calls ai.gitee.com via same-origin proxy: /api/* (Pages Functions) to avoid CORS.
 // - Downloads images/videos via /dl?url=... (Pages Function) to avoid cross-origin blocks.
 
-const BASE_V1 = "https://ai.gitee.com/v1"; // for reference only (proxied)
+const BASE_V1 = "https://ai.gitee.com/v1";
 const $ = (id) => document.getElementById(id);
 
-// FLUX.2-dev 独立分辨率 (按图1)
+// FLUX.2-dev 分辨率 (最大 1024)
 const FLUX_RESOLUTIONS = {
   "1:1 (1024x1024)": "1024x1024",
   "4:3 (1024x768)": "1024x768",
@@ -16,7 +16,7 @@ const FLUX_RESOLUTIONS = {
   "2:3 (640x1024)": "640x1024",
 };
 
-// z-image-turbo 独立分辨率 (按图3/4)
+// z-image-turbo 分辨率 (最大 2048)
 const Z_IMAGE_RESOLUTIONS = {
   "1:1 (2048x2048)": "2048x2048",
   "4:3 (2048x1536)": "2048x1536",
@@ -27,7 +27,7 @@ const Z_IMAGE_RESOLUTIONS = {
   "9:16 (1152x2048)": "1152x2048",
 };
 
-// Qwen-Image-2512 独立分辨率 (按图5/6，注意没有 1:1)
+// Qwen-Image-2512 分辨率 (最大 2048，无 1:1)
 const QWEN_IMAGE_RESOLUTIONS = {
   "4:3 (2048x1536)": "2048x1536",
   "3:4 (1536x2048)": "1536x2048",
@@ -173,7 +173,6 @@ function clearOutput() {
   $("output").innerHTML = "";
 }
 
-// Same-origin proxy to ai.gitee.com/v1
 async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}={}) {
   const res = await fetch(`/api/${path.replace(/^\/+/, "")}`, {
     method,
@@ -184,7 +183,6 @@ async function apiFetch(path, {method="GET", headers={}, body=null, signal=null}
   return res;
 }
 
-// Download proxy for arbitrary file_url/image urls to avoid CORS
 async function dlFetch(url, {signal=null}={}) {
   const u = `/dl?url=${encodeURIComponent(url)}`;
   const res = await fetch(u, {method:"GET", signal});
@@ -212,7 +210,17 @@ function clampFloat(v, lo, hi, defv) {
   return defv;
 }
 
-// 获取随机种子：如果输入为空、-1、0 或小于0，则生成随机正整数
+// ★ 核心修复：从 size 字符串解析出真实的 width 和 height
+function parseSize(sizeStr) {
+  const parts = String(sizeStr).split("x");
+  const w = parseInt(parts[0], 10);
+  const h = parseInt(parts[1], 10);
+  if (!Number.isFinite(w) || !Number.isFinite(h)) {
+    throw new Error(`无法解析 size: ${sizeStr}`);
+  }
+  return { width: w, height: h };
+}
+
 function getRandomSeed(inputId) {
   const raw = $(inputId).value.trim();
   const n = Number.parseInt(raw, 10);
@@ -244,7 +252,6 @@ async function fetchAsBlob(url) {
   return { blob, objUrl };
 }
 
-// 提取公用的图片处理逻辑
 async function handleImageResponse(j, modelName, openAfter) {
   const data = Array.isArray(j.data) ? j.data : [];
   if (!data.length) {
@@ -301,6 +308,7 @@ async function runFlux() {
   if (!prompt) throw new Error("请输入提示词 / Please input prompt");
 
   const size = FLUX_RESOLUTIONS[$("fluxRes").value];
+  const { width, height } = parseSize(size);   // ★ 修复
   const steps = clampInt($("fluxSteps").value, 1, 100, 50);
   const guidance = clampFloat($("fluxGuidance").value, 1, 200, 100);
   const seed = getRandomSeed("fluxSeed");
@@ -308,13 +316,12 @@ async function runFlux() {
 
   setStatus(`FLUX.2-dev 生成中... (seed=${seed}) / Generating...`);
 
-  // 注意：extra_body 的内容需要平铺到请求体顶层
   const payload = {
     prompt,
     model: "FLUX.2-dev",
     size,
-    width: 0,
-    height: 0,
+    width,        // ★ 传真实宽
+    height,       // ★ 传真实高
     num_inference_steps: steps,
     guidance_scale: guidance,
     seed: seed,
@@ -350,20 +357,20 @@ async function runZImage() {
 
   const negative_prompt = $("zNeg").value.trim();
   const size = Z_IMAGE_RESOLUTIONS[$("zRes").value];
+  const { width, height } = parseSize(size);   // ★ 修复
   const steps = clampInt($("zSteps").value, 1, 100, 50);
   const seed = getRandomSeed("zSeed");
   const openAfter = $("zOpenUrl")?.checked || false;
 
   setStatus(`z-image-turbo 生成中... (seed=${seed}) / Generating...`);
 
-  // 注意：extra_body 的内容需要平铺到请求体顶层
   const payload = {
     prompt,
     model: "z-image-turbo",
     size,
     negative_prompt,
-    width: 0,
-    height: 0,
+    width,        // ★
+    height,       // ★
     num_inference_steps: steps,
     seed: seed,
     lora_weights: [],
@@ -400,6 +407,7 @@ async function runQwenImage() {
 
   const negative_prompt = $("qwenImgNeg").value.trim();
   const size = QWEN_IMAGE_RESOLUTIONS[$("qwenImgRes").value];
+  const { width, height } = parseSize(size);   // ★ 修复
   const steps = clampInt($("qwenImgSteps").value, 1, 20, 4);
   const cfg = clampFloat($("qwenImgCfg").value, 1, 10, 1);
   const seed = getRandomSeed("qwenImgSeed");
@@ -407,13 +415,12 @@ async function runQwenImage() {
 
   setStatus(`Qwen-Image-2512 生成中... (seed=${seed}) / Generating...`);
 
-  // 关键修复：把原本放在 extra_body 里的字段全部平铺到顶层
   const payload = {
     prompt,
     model: "Qwen-Image-2512",
     size,
-    width: 0,
-    height: 0,
+    width,        // ★
+    height,       // ★
     num_inference_steps: steps,
     cfg_scale: cfg,
     seed: seed,
@@ -522,7 +529,6 @@ async function runEdit() {
   setStatus("Edit-2511 成功 / Success", "ok");
 }
 
-// 轮询任务状态
 async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, onTick=null}={}) {
   const start = Date.now();
   let tick = 0;
@@ -550,7 +556,6 @@ async function pollTask(taskId, apiKey, {timeoutMs=30*60*1000, intervalMs=6000, 
   return { status: "timeout", raw: { status:"timeout", message:"maximum wait time exceeded" } };
 }
 
-// ---- init UI ----
 function initUi() {
   const initResSelect = (selectId, resolutions, defaultKey) => {
     const sel = $(selectId);
